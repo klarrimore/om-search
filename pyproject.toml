@@ -1,0 +1,28 @@
+[project]
+name = "om-search"
+version = "0.1.0"
+description = "Search the Omarchy Linux manual and CLI commands from the terminal"
+requires-python = ">=3.12"
+authors = [{ name = "Keith Larrimore" }]
+
+[project.scripts]
+om-search = "om_search.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest >=8", "mypy >=1"]
+
+[build-system]
+requires = ["setuptools >=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true

@@ -1,0 +1,79 @@
+"""Tests for fzf integration — preview, section reading, and actions."""
+
+import pytest
+
+from om_search.index import DocCandidate, CmdCandidate
+from om_search.picker import action_for, section_text
+
+
+# Fixture: a minimal manual dir in a temp XDG_DATA_HOME
+FIXTURE_FILE = "04-navigation.md"
+FIXTURE_CONTENT = """# Navigation
+
+Omarchy intro.
+
+## Navigating
+
+Super + Space opens the Omarchy menu.
+
+## Workspaces
+
+You can switch between workspaces with Super + 1-4.
+"""
+
+
+@pytest.fixture(autouse=True)
+def fake_xdg_data(tmp_path, monkeypatch):
+    xdg = tmp_path / "xdg-data"
+    xdg.mkdir()
+    mdir = xdg / "om-search" / "omarchy-repo" / "manual"
+    mdir.mkdir(parents=True)
+    (mdir / FIXTURE_FILE).write_text(FIXTURE_CONTENT)
+    monkeypatch.setenv("XDG_DATA_HOME", str(xdg))
+    yield
+
+
+class TestSectionText:
+    def test_returns_matching_section(self):
+        cand = DocCandidate(
+            page_file=FIXTURE_FILE, anchor="navigating",
+            page_title="Navigation", heading="Navigating",
+        )
+        text = section_text(cand)
+        assert "Super + Space" in text
+        assert "intro" not in text  # intro section, not this one
+
+    def test_returns_intro_when_no_heading(self):
+        cand = DocCandidate(
+            page_file=FIXTURE_FILE, anchor="",
+            page_title="Navigation", heading="",
+        )
+        text = section_text(cand)
+        assert "Omarchy intro" in text
+
+    def test_empty_when_file_missing(self):
+        cand = DocCandidate(
+            page_file="nonexistent.md", anchor="",
+            page_title="", heading="",
+        )
+        assert section_text(cand) == ""
+
+
+class TestAction:
+    def test_action_picks_pager_and_text_for_doc(self):
+        cand = DocCandidate(
+            page_file=FIXTURE_FILE, anchor="navigating",
+            page_title="Navigation", heading="Navigating",
+        )
+        pager, text = action_for(cand)
+        assert pager in ("glow", "less", "cat")
+        assert "Super + Space" in text
+
+    def test_action_echoes_command_for_cmd(self):
+        cand = CmdCandidate(
+            path="omarchy capture screenshot",
+            description="Take a screenshot",
+        )
+        pager, text = action_for(cand)
+        assert pager == "echo"
+        assert text == "omarchy capture screenshot"
