@@ -1,0 +1,28 @@
+# Maintainer: Keith Larrimore <keith@om-search.example>
+# NOTE: source URL placeholder — set to the real repo once pushed.
+
+pkgname=om-search
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Search the Omarchy Linux manual and CLI commands from the terminal"
+arch=('any')
+url="https://github.com/klarrimore/om-search"
+license=('MIT')
+depends=('python>=3.12' 'fzf' 'wl-clipboard')
+makedepends=('python-build' 'python-installer' 'python-wheel')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+
+  # Pacman hook: refresh the manual after every Omarchy update
+  install -Dm644 "$srcdir/$pkgname-$pkgver/packaging/om-search.hook" \
+    "$pkgdir/usr/share/libalpm/hooks/om-search.hook"
+}

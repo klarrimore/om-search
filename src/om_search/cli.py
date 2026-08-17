@@ -71,11 +71,9 @@ def cmd_preview(key1: str, key2: str = "") -> int:
             matching = [s for s in sections if s.anchor == key2]
             if matching:
                 print(matching[0].text)
-            else:
-                # Fall back: print the whole file
-                print(open(resolved).read())
-        else:
-            print(open(resolved).read())
+                return 0
+        # No matching section: print the whole file
+        print(Path(resolved).read_text(encoding="utf-8"))
     else:
         # Command preview: show path + description
         print(key1)
