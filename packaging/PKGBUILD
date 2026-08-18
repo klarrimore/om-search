@@ -1,5 +1,5 @@
-# Maintainer: Keith Larrimore <keith@om-search.example>
-# NOTE: source URL placeholder — set to the real repo once pushed.
+# Maintainer: Keith Larrimore <keith@larrimore.dev>
+# Contributor: Keith Larrimore <keith@larrimore.dev>
 
 pkgname=om-search
 pkgver=0.1.0

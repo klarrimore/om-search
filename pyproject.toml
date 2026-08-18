@@ -3,7 +3,26 @@ name = "om-search"
 version = "0.1.0"
 description = "Search the Omarchy Linux manual and CLI commands from the terminal"
 requires-python = ">=3.12"
-authors = [{ name = "Keith Larrimore" }]
+license = "MIT"
+authors = [
+    { name = "Keith Larrimore" },
+]
+keywords = ["omarchy", "documentation", "search", "cli", "linux"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Documentation",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/klarrimore/om-search"
+Repository = "https://github.com/klarrimore/om-search"
+Issues = "https://github.com/klarrimore/om-search/issues"
 
 [project.scripts]
 om-search = "om_search.cli:main"

@@ -1,9 +1,25 @@
-.venv/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+*.egg
+
+# Virtual environment
+.venv/
+
+# Test artifacts
 .pytest_cache/
 .mypy_cache/
+
+# Dev scrapes — not part of the distributed package
 .firecrawl/
-dist/
-build/
-*.egg-info/
+
+# Agent workspace (project-local, not upstream)
+.scratch/
+
+# OS junk
+.DS_Store
+Thumbs.db
