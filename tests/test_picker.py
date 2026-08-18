@@ -3,7 +3,7 @@
 import pytest
 
 from om_search.index import DocCandidate, CmdCandidate
-from om_search.picker import action_for, section_text
+from om_search.picker import action_for, section_text, picker_header
 
 
 # Fixture: a minimal manual dir in a temp XDG_DATA_HOME
@@ -31,6 +31,31 @@ def fake_xdg_data(tmp_path, monkeypatch):
     (mdir / FIXTURE_FILE).write_text(FIXTURE_CONTENT)
     monkeypatch.setenv("XDG_DATA_HOME", str(xdg))
     yield
+
+
+class TestPickerHeader:
+    def test_all_mode(self):
+        h = picker_header(mode="all")
+        assert "all sources" in h
+        assert "Enter: open" in h
+
+    def test_doc_mode(self):
+        h = picker_header(mode="doc")
+        assert "docs only" in h
+
+    def test_cmd_mode(self):
+        h = picker_header(mode="cmd")
+        assert "commands only" in h
+
+    def test_with_page_filter(self):
+        h = picker_header(mode="all", page_filter="04-navigation.md")
+        assert "page: 04-navigation.md" in h
+        assert "all sources" in h
+
+    def test_with_group_filter(self):
+        h = picker_header(mode="cmd", group_filter="capture")
+        assert "group: capture" in h
+        assert "commands only" in h
 
 
 class TestSectionText:

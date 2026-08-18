@@ -40,13 +40,40 @@ def action_for(cand: Candidate) -> tuple[str, str]:
         return ("echo", cmd.path)
 
 
-def run_fzf(candidates: list[str], query: str = "") -> str | None:
+def picker_header(
+    mode: str = "all",
+    page_filter: str | None = None,
+    group_filter: str | None = None,
+) -> str:
+    """Build the fzf header line describing the active filter."""
+    parts: list[str] = []
+    if mode == "doc":
+        parts.append("docs only")
+    elif mode == "cmd":
+        parts.append("commands only")
+    else:
+        parts.append("all sources")
+
+    if page_filter:
+        parts.append(f"page: {page_filter}")
+    if group_filter:
+        parts.append(f"group: {group_filter}")
+
+    scope = ", ".join(parts)
+    return f"Mode: {scope}  |  Enter: open  |  Ctrl-Y: copy command"
+
+
+def run_fzf(
+    candidates: list[str],
+    query: str = "",
+    mode: str = "all",
+    page_filter: str | None = None,
+    group_filter: str | None = None,
+) -> str | None:
     """Run fzf over the rendered candidates, returning the selected line.
 
     Returns None when the user cancels (no selection).
     """
-    # cmd_preview already renders through mdcat when available.
-    # --ansi is set so fzf interprets the ANSI colour codes.
     preview_cmd = "om-search preview {2} {3}"
 
     cmd = [
@@ -64,7 +91,7 @@ def run_fzf(candidates: list[str], query: str = "") -> str | None:
         "--bind",
         "ctrl-y:execute-silent(echo -n {2} | wl-copy)+accept",
         "--header",
-        "Enter: open  |  Ctrl-Y: copy command",
+        picker_header(mode, page_filter, group_filter),
     ]
     if query:
         cmd.extend(["--query", query])
@@ -72,6 +99,34 @@ def run_fzf(candidates: list[str], query: str = "") -> str | None:
     proc = subprocess.run(
         cmd,
         input="\n".join(candidates) + "\n",
+        text=True,
+        capture_output=True,
+    )
+    out = proc.stdout.strip()
+    return out or None
+
+
+def run_simple_fzf(
+    items: list[str],
+    header: str = "",
+    query: str = "",
+) -> str | None:
+    """Run fzf over a simple list of strings (no tab-delimited fields).
+
+    Returns the selected line, or None on cancel.
+    """
+    cmd = [
+        "fzf",
+        "--tiebreak=end",
+    ]
+    if header:
+        cmd.extend(["--header", header])
+    if query:
+        cmd.extend(["--query", query])
+
+    proc = subprocess.run(
+        cmd,
+        input="\n".join(items) + "\n",
         text=True,
         capture_output=True,
     )

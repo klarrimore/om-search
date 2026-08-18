@@ -6,4 +6,4 @@ Target = omarchy
 [Action]
 Description = Refresh the om-search manual index
 When = PostTransaction
-Exec = /usr/bin/om-search update
+Exec = /usr/bin/om-search --update

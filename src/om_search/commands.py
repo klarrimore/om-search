@@ -15,6 +15,18 @@ class Command:
     description: str
 
 
+def list_groups(commands: list[Command]) -> list[str]:
+    """Return unique command group names, sorted."""
+    seen: set[str] = set()
+    groups: list[str] = []
+    for c in commands:
+        if c.group not in seen:
+            seen.add(c.group)
+            groups.append(c.group)
+    groups.sort()
+    return groups
+
+
 def parse_commands_json(raw: str) -> list[Command]:
     """Parse the output of `omarchy commands --json` into a flat command list.
 

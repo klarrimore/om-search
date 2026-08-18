@@ -40,13 +40,30 @@ uv tool install dist/*.whl
 ## Usage
 
 ```sh
-om-search            # open the picker
-om-search screenshot # open the picker with "screenshot" pre-filled
-om-search update     # pull the latest manual and re-index commands
+om-search                    # open the picker with all sources
+om-search screenshot         # open the picker, pre-filled with "screenshot"
+om-search --docs             # search manual documentation only
+om-search --cmds             # search CLI commands only
+om-search --pages            # browse manual pages, pick one to search within
+om-search --groups           # browse command groups, pick one to search within
+om-search --page 04-navigation.md   # search within a specific page
+om-search --group capture    # search within a specific command group
+om-search --update           # pull the latest manual and re-index commands
 ```
 
 On machines without the `omarchy` CLI (non-Omarchy distros), the command
 surface is disabled and doc search still works -- degraded mode.
+
+## Navigation model
+
+`om-search` follows the Omarchy CLI style: common operations at the top
+level, specialised scoping via flags.  The default picker shows all
+documentation sections and CLI commands interleaved.  Use `--docs` or
+`--cmds` to focus one source, or drill into a specific page or group
+with `--page` or `--group`.
+
+The `--pages` and `--groups` flags open a page/group browser (also fzf).
+Picking a result launches a picker scoped to that page or group.
 
 ## How it works
 
@@ -54,7 +71,7 @@ The manual is cloned shallowly and sparsely into the XDG data dir
 (`~/.local/share/om-search/omarchy-repo/manual/`), tracking the `quattro`
 branch of the upstream Omarchy repository. A pacman hook (shipped in
 `packaging/om-search.hook` and installed via the AUR package) triggers
-`om-search update` after every system update so the docs stay in sync
+`om-search --update` after every system update so the docs stay in sync
 with the installed release.
 
 ## Development

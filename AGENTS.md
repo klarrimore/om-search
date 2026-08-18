@@ -29,3 +29,4 @@ Five canonical role labels defined in `docs/agents/triage-labels.md`.
 - Type check: `uv run mypy src/`
 - Build: `uv build`
 - Install from wheel: `uv tool install dist/*.whl`
+- Update manual: `om-search --update`

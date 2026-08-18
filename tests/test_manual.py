@@ -8,7 +8,28 @@ import pytest
 FIXTURES = Path(__file__).parent / "fixtures" / "manual"
 
 # Test targets imported from the package
-from om_search.manual import Section, parse_manual_file, anchor_from_heading
+from om_search.manual import Section, PageInfo, parse_manual_file, anchor_from_heading, list_pages
+
+
+class TestListPages:
+    def test_returns_all_pages(self):
+        pages = list_pages(FIXTURES)
+        titles = [p.page_title for p in pages]
+        assert "Welcome to Omarchy!" in titles
+        assert "Screenshots & Recording" in titles
+
+    def test_sorted_by_page_number(self):
+        pages = list_pages(FIXTURES)
+        assert pages[0].page_number == 4
+        assert pages[1].page_number == 12
+
+    def test_page_file_included(self):
+        pages = list_pages(FIXTURES)
+        assert pages[0].page_file == "04-navigation.md"
+
+    def test_page_info_dataclass(self):
+        pages = list_pages(FIXTURES)
+        assert isinstance(pages[0], PageInfo)
 
 
 class TestAnchorFromHeading:

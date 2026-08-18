@@ -42,6 +42,54 @@ def test_build_candidates_sections_and_commands():
     assert cmds[0].path == "omarchy capture screenshot"
 
 
+class TestBuildMode:
+    def test_doc_mode_excludes_commands(self):
+        sections = [
+            Section(page_file="01-test.md", page_number=1,
+                    page_title="Test", heading="",
+                    anchor="", text="Content."),
+        ]
+        commands = [
+            Command(group="t", name="c", path="omarchy t c", description="cmd"),
+        ]
+        candidates = build_candidates(sections, commands, mode="doc")
+        assert all(c.type == "doc" for c in candidates)
+
+    def test_cmd_mode_excludes_docs(self):
+        sections = [
+            Section(page_file="01-test.md", page_number=1,
+                    page_title="Test", heading="",
+                    anchor="", text="Content."),
+        ]
+        commands = [
+            Command(group="t", name="c", path="omarchy t c", description="cmd"),
+        ]
+        candidates = build_candidates(sections, commands, mode="cmd")
+        assert all(c.type == "cmd" for c in candidates)
+
+    def test_page_filter_filters_docs(self):
+        sections = [
+            Section(page_file="01-a.md", page_number=1,
+                    page_title="A", heading="", anchor="", text="A."),
+            Section(page_file="02-b.md", page_number=2,
+                    page_title="B", heading="", anchor="", text="B."),
+        ]
+        candidates = build_candidates(sections, [], page_filter="01-a.md")
+        assert len(candidates) == 1
+        assert candidates[0].page_file == "01-a.md"
+
+    def test_group_filter_filters_commands(self):
+        commands = [
+            Command(group="audio", name="vol", path="omarchy audio vol",
+                    description="Volume"),
+            Command(group="capture", name="shot", path="omarchy capture shot",
+                    description="Screenshot"),
+        ]
+        candidates = build_candidates([], commands, group_filter="audio")
+        assert len(candidates) == 1
+        assert candidates[0].path == "omarchy audio vol"
+
+
 def test_render_round_trips_doc():
     cand = DocCandidate(
         page_file="04-navigation.md", anchor="navigating",

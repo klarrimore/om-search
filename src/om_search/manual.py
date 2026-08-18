@@ -21,6 +21,15 @@ class Section:
     text: str
 
 
+@dataclass(frozen=True)
+class PageInfo:
+    """Metadata about one manual page, used for browsing."""
+
+    page_file: str
+    page_number: int
+    page_title: str
+
+
 def anchor_from_heading(heading: str) -> str:
     """Convert a markdown heading into the anchor slug the website uses.
 
@@ -29,6 +38,22 @@ def anchor_from_heading(heading: str) -> str:
     """
     slug = ANCHOR_CHARS_RE.sub("", heading.lower())
     return re.sub(r"\s+", "-", slug).strip("-")
+
+
+def list_pages(mdir: Path) -> list[PageInfo]:
+    """Scan the manual directory and return metadata for every page.
+
+    Pages are sorted by their numeric prefix.  Only ``.md`` files that
+    start with a digit are included.
+    """
+    pages: list[PageInfo] = []
+    for f in sorted(mdir.glob("[0-9]*.md")):
+        text = f.read_text(encoding="utf-8")
+        match = H1_RE.search(text)
+        title = match.group(1).strip() if match else f.stem
+        num = _number_from_filename(f.name)
+        pages.append(PageInfo(page_file=f.name, page_number=num, page_title=title))
+    return pages
 
 
 def parse_manual_file(path: Path) -> list[Section]:

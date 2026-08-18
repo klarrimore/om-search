@@ -32,11 +32,13 @@ class CmdCandidate:
 Candidate = Union[DocCandidate, CmdCandidate]
 
 
-def _interleave(docs: Sequence[Candidate], cmds: Sequence[Candidate], docs_per_cmd: int = 4) -> list[Candidate]:
+def _interleave(
+    docs: Sequence[Candidate], cmds: Sequence[Candidate], docs_per_cmd: int = 4
+) -> list[Candidate]:
     """Interleave docs and commands so commands are visible early in the list.
 
-    Places one command roughly every `docs_per_cmd` items.  Remaining items
-    of the larger group are appended at the end.
+    Places one command roughly every ``docs_per_cmd`` items.  Remaining
+    items of the larger group are appended at the end.
     """
     result: list[Candidate] = []
     di, ci = 0, 0
@@ -52,9 +54,26 @@ def _interleave(docs: Sequence[Candidate], cmds: Sequence[Candidate], docs_per_c
 
 
 def build_candidates(
-    sections: list[Section], commands: list[Command]
+    sections: list[Section],
+    commands: list[Command],
+    mode: str = "all",
+    page_filter: str | None = None,
+    group_filter: str | None = None,
 ) -> list[Candidate]:
     """Merge manual sections and CLI commands into a single candidate list.
+
+    Parameters
+    ----------
+    sections:
+        Parsed manual sections.
+    commands:
+        Parsed CLI command entries.
+    mode:
+        ``"all"`` (default), ``"doc"``, or ``"cmd"``.
+    page_filter:
+        If set, only include sections from this page file name.
+    group_filter:
+        If set, only include commands from this group.
 
     Results are interleaved so commands appear throughout the list rather
     than always at the bottom.  Within each type, docs sort by page number
@@ -69,10 +88,14 @@ def build_candidates(
             text=s.text,
         )
         for s in sorted(sections, key=lambda s: (s.page_number, s.heading))
+        if mode != "cmd"
+        and (page_filter is None or s.page_file == page_filter)
     ]
     cmds = [
         CmdCandidate(path=c.path, description=c.description)
         for c in sorted(commands, key=lambda c: c.path)
+        if mode != "doc"
+        and (group_filter is None or c.group == group_filter)
     ]
     return _interleave(docs, cmds)
 
@@ -80,15 +103,17 @@ def build_candidates(
 def render_candidate(cand: Candidate) -> str:
     """Render a candidate as a tab-delimited fzf line.
 
-    Field layout (0-indexed):
-      0: type        ("doc" | "cmd")
-      1: page_file   (doc)  | path       (cmd)   -- preview key
-      2: anchor      (doc)  | description (cmd)   -- preview key
-      3: display     human-readable line for the picker
+    Field layout (0-indexed)::
 
-    The display text is a single field so `--with-nth 4` works for both types.
-    The full section text is never embedded in the line (it may contain
-    newlines); the preview and action commands read it from the file.
+        0: type        ("doc" | "cmd")
+        1: page_file   (doc)  | path       (cmd)   -- preview key
+        2: anchor      (doc)  | description (cmd)   -- preview key
+        3: display     human-readable line for the picker
+
+    The display text is a single field so ``--with-nth 4`` works for both
+    types.  The full section text is never embedded in the line (it may
+    contain newlines); the preview and action commands read it from the
+    file.
     """
     if cand.type == "doc":
         doc = cast(DocCandidate, cand)

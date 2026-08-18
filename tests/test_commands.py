@@ -1,6 +1,22 @@
 """Tests for parsing `omarchy commands --json` output."""
 
-from om_search.commands import Command, parse_commands_json
+from om_search.commands import Command, parse_commands_json, list_groups
+
+
+class TestListGroups:
+    def test_returns_unique_sorted_groups(self):
+        commands = [
+            Command(group="capture", name="screenshot", path="omarchy capture screenshot",
+                    description="Take a screenshot"),
+            Command(group="audio", name="volume", path="omarchy audio volume",
+                    description="Set volume"),
+            Command(group="capture", name="qr", path="omarchy capture qr",
+                    description="Decode a QR code"),
+        ]
+        assert list_groups(commands) == ["audio", "capture"]
+
+    def test_empty_list_returns_empty(self):
+        assert list_groups([]) == []
 
 
 class TestParseCommandsJson:

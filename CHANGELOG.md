@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Source filtering: `--docs` and `--cmds` flags to search only documentation or only CLI commands. (#5)
+- Page and group browsing: `--pages` and `--groups` flags for drill-down navigation. (#5)
+- `--page <file>` and `--group <name>` flags for scoped search within a specific page or command group. (#5)
+- `--update` flag (replaces the ``update`` subcommand) for refreshing the manual. (#5)
+- Page list and group list helpers exposed from the library layer. (#5)
+
+### Changed
+- CLI argument parsing switched to flags (``--docs``, ``--pages``, etc.) instead of subparsers, following the Omarchy CLI convention.  The ``preview`` subcommand remains for fzf integration. (#5)
+- Picker header now reflects the active filter mode and scope. (#5)
+
 ## [0.1.0] - 2026-08-18
 
 ### Added
@@ -28,4 +41,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PyPI package metadata, MIT license, classifiers, and project URLs. (#4)
 - Development toolchain: pytest, mypy, uv build. (#1)
 
+[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/klarrimore/om-search/releases/tag/v0.1.0
