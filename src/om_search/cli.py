@@ -55,6 +55,7 @@ def cmd_preview(key1: str, key2: str = "") -> int:
     key2 is the anchor (for doc) or description (for cmd).
     """
     import os
+    import shutil
 
     # Resolve a relative page_file against the manual directory
     resolved = key1
@@ -64,16 +65,27 @@ def cmd_preview(key1: str, key2: str = "") -> int:
     is_file = os.path.isfile(resolved)
     if is_file:
         # Doc preview: read the file and show the section
-        from om_search.manual import parse_manual_file
-
         sections = parse_manual_file(Path(resolved))
         if key2:
             matching = [s for s in sections if s.anchor == key2]
             if matching:
-                print(matching[0].text)
-                return 0
-        # No matching section: print the whole file
-        print(Path(resolved).read_text(encoding="utf-8"))
+                text = matching[0].text
+            else:
+                text = Path(resolved).read_text(encoding="utf-8")
+        else:
+            text = Path(resolved).read_text(encoding="utf-8")
+
+        # Render through mdcat for coloured markdown when in a preview context
+        if shutil.which("mdcat"):
+            result = subprocess.run(
+                ["mdcat", "--ansi", "-"],
+                input=text,
+                capture_output=True,
+                text=True,
+            )
+            print(result.stdout, end="")
+        else:
+            print(text)
     else:
         # Command preview: show path + description
         print(key1)

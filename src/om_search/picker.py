@@ -45,14 +45,20 @@ def run_fzf(candidates: list[str], query: str = "") -> str | None:
 
     Returns None when the user cancels (no selection).
     """
+    # cmd_preview already renders through mdcat when available.
+    # --ansi is set so fzf interprets the ANSI colour codes.
+    preview_cmd = "om-search preview {2} {3}"
+
     cmd = [
         "fzf",
+        "--tiebreak=begin,end",
+        "--ansi",
         "--delimiter",
         "\t",
         "--with-nth",
         "4",
         "--preview",
-        "om-search preview {2} {3}",
+        preview_cmd,
         "--preview-window",
         "right:60%:wrap",
         "--bind",
