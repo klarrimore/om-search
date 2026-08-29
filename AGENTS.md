@@ -30,3 +30,6 @@ Five canonical role labels defined in `docs/agents/triage-labels.md`.
 - Build: `uv build`
 - Install from wheel: `uv tool install dist/*.whl`
 - Update manual: `om-search --update`
+
+## Guidelines
+- Do not add any Co-Author or nonsense to the commit messages

@@ -1,6 +1,7 @@
 """om-search CLI — entry point and orchestration."""
 
 import argparse
+import argcomplete
 import shutil
 import subprocess
 import sys
@@ -142,7 +143,11 @@ def cmd_preview(key1: str, key2: str = "") -> int:
 
 
 def _render_text(text: str) -> None:
-    """Render markdown text to the terminal, using mdcat if available."""
+    """Render markdown text to the terminal with color and formatting.
+
+    Tries mdcat (true markdown rendering), then bat (syntax-highlighted
+    markdown source), then falls back to plain text.
+    """
     if shutil.which("mdcat"):
         result = subprocess.run(
             ["mdcat", "--ansi", "-"],
@@ -151,8 +156,19 @@ def _render_text(text: str) -> None:
             text=True,
         )
         print(result.stdout, end="")
-    else:
-        print(text)
+        return
+
+    if shutil.which("bat"):
+        result = subprocess.run(
+            ["bat", "--language=md", "--paging=never", "--wrap=character", "--decorations=never", "--color=always", "-"],
+            input=text,
+            capture_output=True,
+            text=True,
+        )
+        print(result.stdout, end="")
+        return
+
+    print(text)
 
 
 def cmd_picker(
@@ -322,6 +338,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Browse command groups, pick one to search within",
     )
+    parser.add_argument(
+        "--completion",
+        action="store_true",
+        default=False,
+        help="Print shell completion setup and exit",
+    )
     return parser
 
 
@@ -335,9 +357,15 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_preview(argv[1], argv[2] if len(argv) > 2 else "")
 
     parser = build_parser()
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
 
     query = " ".join(args.query)
+
+    if args.completion:
+        print("Add to ~/.bashrc or ~/.zshrc:")
+        print('  eval "$(register-python-argcomplete om-search)"')
+        return 0
 
     if args.update:
         return cmd_update()

@@ -3,6 +3,7 @@ name = "om-search"
 version = "0.1.0"
 description = "Search the Omarchy Linux manual and CLI commands from the terminal"
 requires-python = ">=3.12"
+dependencies = ["argcomplete >=3.5"]
 license = "MIT"
 authors = [
     { name = "Keith Larrimore" },

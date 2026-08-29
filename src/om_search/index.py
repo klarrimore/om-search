@@ -203,9 +203,9 @@ def render_candidate(cand: Candidate) -> str:
         3: display     human-readable line for picker
         4: body        (doc) body excerpt for matching | (cmd) empty
 
-    ``--with-nth 4`` shows only the display field.  ``--nth 4,5`` makes
-    fzf match against both the heading and the body excerpt, so users
-    can find pages by typing words from the content.
+    ``--with-nth 4`` shows only the display field.  fzf then searches
+    the transformed line (field 4 — the full display text), so users
+    can find pages by typing words from the heading or title.
     """
     if cand.type == "doc":
         doc = cast(DocCandidate, cand)
