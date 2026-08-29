@@ -1,6 +1,10 @@
 """Tests for parsing `omarchy commands --json` output."""
 
+from pathlib import Path
+
 from om_search.commands import Command, parse_commands_json, list_groups
+
+FIXTURES = Path(__file__).parent / "fixtures" / "commands"
 
 
 class TestListGroups:
@@ -88,3 +92,41 @@ class TestParseCommandsJson:
 
     def test_empty_input_returns_empty(self):
         assert parse_commands_json("") == []
+
+
+class TestParseFullFixture:
+    """Load the full command tree fixture and verify all omarchy command categories survive parsing."""
+
+    def _load_fixture(self) -> str:
+        return (FIXTURES / "full-tree.json").read_text(encoding="utf-8")
+
+    def test_all_categories_parsed(self):
+        raw = self._load_fixture()
+        commands = parse_commands_json(raw)
+        categories = sorted({c.group for c in commands})
+        assert "refresh" in categories
+        assert "restart" in categories
+        assert "toggle" in categories
+        assert "theme" in categories
+        assert "install" in categories
+        assert "launch" in categories
+        assert "cmd" in categories
+        assert "pkg" in categories
+        assert "setup" in categories
+        assert "font" in categories
+
+    def test_known_commands_present(self):
+        raw = self._load_fixture()
+        commands = parse_commands_json(raw)
+        paths = {c.path for c in commands}
+        assert "omarchy theme set" in paths
+        assert "omarchy pkg add" in paths
+        assert "omarchy pkg drop" in paths
+        assert "omarchy restart waybar" in paths
+        assert "omarchy system shutdown" in paths
+        assert "omarchy menu keybindings" in paths
+
+    def test_count_matches_expected(self):
+        raw = self._load_fixture()
+        commands = parse_commands_json(raw)
+        assert len(commands) >= 20

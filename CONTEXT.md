@@ -24,7 +24,7 @@ _Avoid_: database, cache
 The state of `om-search` on a machine without the `omarchy` CLI. Docs search works from the bundled manual; the command surface is empty or disabled. Never a hard failure.
 
 **Update hook**:
-The mechanism that refreshes the bundled manual after the Omarchy system updates, so the docs stay in sync with the installed release. A pacman hook triggers `om-search update`.
+The mechanism that refreshes the bundled manual after the Omarchy system updates, so the docs stay in sync with the installed release. A pacman hook triggers `om-search --update`.
 _Avoid_: refresh, sync job
 
 **Fuzzy picker**:
@@ -37,3 +37,41 @@ _Avoid_: open in browser, open in editor
 **Command (selected result)**:
 An `omarchy` CLI command chosen from the fuzzy picker. Printed to stdout. The user can also copy it to the clipboard via a keybinding.
 _Avoid_: execute directly, shell out
+
+## Architecture
+
+**Hyprland**:
+The Wayland compositor and window manager on Omarchy. Config files at `~/.config/hypr/*.lua` (Lua-based in the quattro branch; any `*.conf` in that directory is an orphaned pre-quattro leftover). Auto-reloads on file save. Users search for keybindings, window rules, monitors, animations, lock screen, night light.
+_Avoid_: i3, sway
+
+**Waybar**:
+The status bar. Config at `~/.config/waybar/config.jsonc` (layout and modules) and `~/.config/waybar/style.css` (styling). Does NOT auto-reload -- must run `omarchy-restart-waybar` after changes.
+_Avoid_: polybar, eww
+
+**Walker**:
+The app launcher. Config at `~/.config/walker/config.toml`.
+_Avoid_: rofi, dmenu
+
+**Mako**:
+The notification daemon. Config under `~/.config/mako/`.
+_Avoid_: dunst, notify-send
+
+**SwayOSD**:
+The on-screen display for volume, brightness, caps lock. Config at `~/.config/swayosd/`.
+_Avoid_: volume popup, osd window
+
+**Quickshell**:
+The desktop shell providing panels and widgets on Omarchy. Not directly user-configured.
+_Avoid_: panel, taskbar
+
+**Terminals**:
+Supported terminals: Alacritty (`~/.config/alacritty/alacritty.toml`), Kitty (`~/.config/kitty/kitty.conf`), Ghostty (`~/.config/ghostty/config`). Users search for font configuration, transparency, color scheme.
+_Avoid_: gnome-terminal, konsole
+
+**Keybindings**:
+Hyprland key assignments defined in `~/.config/hypr/bindings.lua`. View current bindings with `omarchy-menu-keybindings --print`. Re-binding an existing key requires an `unbind` directive before the new `bind`.
+_Avoid_: hotkeys, shortcuts
+
+## Search topics
+
+See `docs/search-topics.md` for the full cross-reference of user-facing search terms mapped to Omarchy manual pages, commands, and failure-mode gotchas.

@@ -1,0 +1,100 @@
+{
+  "refresh": {
+    "description": "Reset configs to defaults (backed up first)",
+    "commands": {
+      "waybar": {"description": "Reset Waybar to default config"},
+      "hyprland": {"description": "Reset Hyprland to default config"}
+    }
+  },
+  "restart": {
+    "description": "Restart services and apps",
+    "commands": {
+      "waybar": {"description": "Restart Waybar"},
+      "walker": {"description": "Restart Walker"},
+      "terminal": {"description": "Restart the terminal emulator"}
+    }
+  },
+  "toggle": {
+    "description": "Toggle features on and off",
+    "commands": {
+      "nightlight": {"description": "Toggle night light"},
+      "waybar": {"description": "Toggle Waybar visibility"}
+    }
+  },
+  "theme": {
+    "description": "Theme management",
+    "commands": {
+      "list": {"description": "List available themes"},
+      "current": {"description": "Show current theme"},
+      "set": {"description": "Apply a theme, e.g. omarchy-theme-set \"Tokyo Night\""},
+      "next": {"description": "Cycle to next theme"},
+      "bg-next": {"description": "Cycle wallpaper"},
+      "install": {"description": "Install a theme from a git URL"}
+    }
+  },
+  "install": {
+    "description": "Install optional software",
+    "commands": {
+      "docker-dbs": {"description": "Install Docker databases (PostgreSQL, MySQL, Redis)"}
+    }
+  },
+  "launch": {
+    "description": "Launch applications",
+    "commands": {
+      "browser": {"description": "Open the default browser"}
+    }
+  },
+  "cmd": {
+    "description": "System commands",
+    "commands": {
+      "screenshot": {"description": "Take a screenshot"}
+    }
+  },
+  "pkg": {
+    "description": "Package management",
+    "commands": {
+      "add": {"description": "Install a package (preferred)"},
+      "aur-add": {"description": "Install an AUR-only package"},
+      "drop": {"description": "Remove a package"}
+    }
+  },
+  "setup": {
+    "description": "Initial setup tasks",
+    "commands": {
+      "fingerprint": {"description": "Set up fingerprint authentication"}
+    }
+  },
+  "font": {
+    "description": "Font management",
+    "commands": {
+      "list": {"description": "List available fonts"},
+      "current": {"description": "Show current font"},
+      "set": {"description": "Change the system font"}
+    }
+  },
+  "menu": {
+    "description": "Omarchy menu utilities",
+    "commands": {
+      "keybindings": {"description": "Show current keybindings"}
+    }
+  },
+  "system": {
+    "description": "Power and system control",
+    "commands": {
+      "shutdown": {"description": "Shutdown the computer"},
+      "reboot": {"description": "Reboot the computer"}
+    }
+  },
+  "debug": {
+    "description": "Debug and diagnostics",
+    "commands": {
+      "debug": {"description": "Print system debug info (use --no-sudo --print to avoid interactive prompts)"}
+    }
+  },
+  "upload": {
+    "description": "Log upload for support",
+    "commands": {
+      "log": {"description": "Upload logs for support"}
+    }
+  }
+}
