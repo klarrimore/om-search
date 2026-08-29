@@ -18,8 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Index rebuilt automatically after manual clone and pull. (#7)
 - `build_index` and `load_index` helpers exposed from the index layer. (#7)
 
+### Fixed
+- Interactive search query (`om-search <term>`) now filters the picker correctly instead of displaying all results — fzf `--nth 4,5` operated on the transformed (single-field) line, making the fields unreachable. (#8)
+
 ### Changed
-- CLI argument parsing switched to flags (``--docs``, ``--pages``, etc.) instead of subparsers, following the Omarchy CLI convention.  The ``preview`` subcommand remains for fzf integration. (#5)
+- CLI argument parsing… switched to flags (``--docs``, ``--pages``, etc.) instead of subparsers, following the Omarchy CLI convention.  The ``preview`` subcommand remains for fzf integration. (#5)
 - Picker header now reflects the active filter mode and scope. (#5)
 - Sections and previews now read from the pre-built index with fallback to on-disk parsing. (#7)
 

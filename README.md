@@ -7,7 +7,7 @@ Search the [Omarchy Linux](https://github.com/basecamp/omarchy) manual and CLI c
 - Bundles the Omarchy manual for offline search
 - Pulls the live `omarchy` CLI command tree on systems where it is installed
 - Opens an interactive fzf picker: type to fuzzy-match across manual sections and commands together
-- Fuzzy-matches against section body text, not just titles -- type what you are looking for
+- Fuzzy-matches against page titles and section headings in the picker display
 - Doc results open in a markdown viewer (`glow` / `mdcat`) or `less`
 - Command results print to stdout; `Ctrl-Y` copies the command to the clipboard (Wayland)
 
