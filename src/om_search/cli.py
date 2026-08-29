@@ -7,9 +7,16 @@ import sys
 from pathlib import Path
 
 from om_search.commands import Command, list_groups, parse_commands_json
-from om_search.index import build_candidates, parse_fzf_line, render_candidate
+from om_search.index import (
+    INDEX_FILENAME,
+    build_candidates,
+    build_index,
+    load_index,
+    parse_fzf_line,
+    render_candidate,
+)
 from om_search.manual import Section, list_pages, parse_manual_file
-from om_search.paths import repo_dir, manual_dir
+from om_search.paths import data_dir, repo_dir, manual_dir
 from om_search.picker import action_for, run_fzf, run_simple_fzf
 from om_search.update import ensure_manual, update_manual
 
@@ -43,21 +50,36 @@ def _ensure_manual() -> Path:
 
 
 def _load_sections(mdir: Path) -> list[Section]:
-    """Parse every markdown file in the manual directory."""
-    sections: list[Section] = []
+    """Load sections from the pre-built index, or parse from disk."""
+    index_path = data_dir() / INDEX_FILENAME
+    index_data = load_index(index_path)
+    if index_data is not None:
+        return index_data[0]
+    # Fallback: parse every markdown file
+    result: list[Section] = []
     for f in sorted(mdir.glob("*.md")):
-        sections.extend(parse_manual_file(f))
-    return sections
+        result.extend(parse_manual_file(f))
+    return result
 
 
 def cmd_update() -> int:
-    """Update the manual repository and re-cache commands."""
+    """Update the manual repository, rebuild index, and re-cache commands."""
     ok = update_manual(repo_dir())
     if ok:
         print("Manual updated.")
     else:
         print("Update failed.", file=sys.stderr)
         return 1
+
+    # Rebuild the pre-built index
+    mdir = manual_dir()
+    if mdir.exists():
+        build_index(mdir, data_dir() / INDEX_FILENAME)
+        print("Search index rebuilt.")
+        sections = _load_sections(mdir)
+        print(f"{len(sections)} doc sections indexed.")
+    else:
+        print("No manual directory found; index not built.", file=sys.stderr)
 
     cmds = find_commands()
     if cmds:
@@ -70,9 +92,28 @@ def cmd_update() -> int:
 def cmd_preview(key1: str, key2: str = "") -> int:
     """Render preview content for the fzf preview window (internal command).
 
-    key1 is the file path (for doc) or command path (for cmd).
+    Reads from the pre-built index for speed.  Falls back to parsing
+    the markdown file from disk when the index is unavailable.
+
+    key1 is the page file name (for doc) or command path (for cmd).
     key2 is the anchor (for doc) or description (for cmd).
     """
+    # Try pre-built index first
+    index_path = data_dir() / INDEX_FILENAME
+    index_data = load_index(index_path)
+    if index_data is not None:
+        sections, page_texts = index_data
+        text: str | None = None
+        if key2:
+            matching = [s for s in sections if s.page_file == key1 and s.anchor == key2]
+            text = matching[0].text if matching else None
+        if text is None:
+            text = page_texts.get(key1)
+        if text:
+            _render_text(text)
+            return 0
+
+    # Fallback: read from disk
     import os
 
     resolved = key1
@@ -91,22 +132,27 @@ def cmd_preview(key1: str, key2: str = "") -> int:
         else:
             text = Path(resolved).read_text(encoding="utf-8")
 
-        if shutil.which("mdcat"):
-            result = subprocess.run(
-                ["mdcat", "--ansi", "-"],
-                input=text,
-                capture_output=True,
-                text=True,
-            )
-            print(result.stdout, end="")
-        else:
-            print(text)
+        _render_text(text)
     else:
         print(key1)
         if key2:
             print()
             print(key2)
     return 0
+
+
+def _render_text(text: str) -> None:
+    """Render markdown text to the terminal, using mdcat if available."""
+    if shutil.which("mdcat"):
+        result = subprocess.run(
+            ["mdcat", "--ansi", "-"],
+            input=text,
+            capture_output=True,
+            text=True,
+        )
+        print(result.stdout, end="")
+    else:
+        print(text)
 
 
 def cmd_picker(
@@ -142,17 +188,44 @@ def cmd_picker(
     return 0
 
 
+def _list_pages(
+    mdir: Path,
+) -> list[dict[str, str | int]]:
+    """List manual pages, preferring the pre-built index over disk scan."""
+    index_path = data_dir() / INDEX_FILENAME
+    index_data = load_index(index_path)
+    if index_data is not None:
+        sections, _ = index_data
+        seen: set[str] = set()
+        result: list[dict[str, str | int]] = []
+        for s in sections:
+            if s.page_file not in seen:
+                seen.add(s.page_file)
+                result.append({
+                    "number": s.page_number,
+                    "title": s.page_title,
+                    "file": s.page_file,
+                })
+        result.sort(key=lambda p: p["number"])
+        return result
+    # Fallback: disk scan
+    return [
+        {"number": p.page_number, "title": p.page_title, "file": p.page_file}
+        for p in list_pages(mdir)
+    ]
+
+
 def cmd_pages(query: str = "") -> int:
     """Browse manual pages: pick one, then search within it."""
     mdir = _ensure_manual()
-    pages = list_pages(mdir)
+    pages = _list_pages(mdir)
 
     if not pages:
         print("No pages found.", file=sys.stderr)
         return 1
 
     items = [
-        f"{p.page_number:02d}  {p.page_title}  ({p.page_file})"
+        f"{p['number']:02d}  {p['title']}  ({p['file']})"
         for p in pages
     ]
     header = "Pick a page to search within  |  Enter: select  |  Esc/Ctrl-C: cancel"

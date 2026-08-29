@@ -4,13 +4,41 @@ import shutil
 import subprocess
 from typing import cast
 
-from om_search.index import Candidate, CmdCandidate, DocCandidate
+from om_search.index import (
+    Candidate,
+    CmdCandidate,
+    DocCandidate,
+    INDEX_FILENAME,
+    load_index,
+)
 from om_search.manual import parse_manual_file
-from om_search.paths import manual_dir
+from om_search.paths import data_dir, manual_dir
 
 
 def section_text(cand: DocCandidate) -> str:
-    """Read the section text for a doc candidate from its manual file."""
+    """Read the section text for a doc candidate.
+
+    Tries the pre-built index first, then falls back to parsing the
+    markdown file from disk.
+    """
+    # Try index first
+    index_path = data_dir() / INDEX_FILENAME
+    index_data = load_index(index_path)
+    if index_data is not None:
+        sections, page_texts = index_data
+        for s in sections:
+            if (
+                s.page_file == cand.page_file
+                and s.anchor == cand.anchor
+                and s.heading == cand.heading
+            ):
+                return s.text
+        # Section not found by anchor — return full page text
+        full = page_texts.get(cand.page_file, "")
+        if full:
+            return full
+
+    # Fallback: parse from disk
     path = manual_dir() / cand.page_file
     try:
         sections = parse_manual_file(path)
@@ -73,6 +101,8 @@ def run_fzf(
     """Run fzf over the rendered candidates, returning the selected line.
 
     Returns None when the user cancels (no selection).
+    Field 3 is displayed; fields 3 and 4 are both searched so body
+    content is discoverable.
     """
     preview_cmd = "om-search preview {2} {3}"
 
@@ -84,6 +114,8 @@ def run_fzf(
         "\t",
         "--with-nth",
         "4",
+        "--nth",
+        "4,5",
         "--preview",
         preview_cmd,
         "--preview-window",

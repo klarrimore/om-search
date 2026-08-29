@@ -7,6 +7,7 @@ Search the [Omarchy Linux](https://github.com/basecamp/omarchy) manual and CLI c
 - Bundles the Omarchy manual for offline search
 - Pulls the live `omarchy` CLI command tree on systems where it is installed
 - Opens an interactive fzf picker: type to fuzzy-match across manual sections and commands together
+- Fuzzy-matches against section body text, not just titles -- type what you are looking for
 - Doc results open in a markdown viewer (`glow` / `mdcat`) or `less`
 - Command results print to stdout; `Ctrl-Y` copies the command to the clipboard (Wayland)
 
@@ -69,7 +70,10 @@ Picking a result launches a picker scoped to that page or group.
 
 The manual is cloned shallowly and sparsely into the XDG data dir
 (`~/.local/share/om-search/omarchy-repo/manual/`), tracking the `quattro`
-branch of the upstream Omarchy repository. A pacman hook (shipped in
+branch of the upstream Omarchy repository. On update it is parsed once into a
+pre-built JSON index (`~/.local/share/om-search/index.json`) that the picker
+and preview use directly for fast startup, so the 51 manual pages are not
+re-parsed on every keystroke. A pacman hook (shipped in
 `packaging/om-search.hook` and installed via the AUR package) triggers
 `om-search --update` after every system update so the docs stay in sync
 with the installed release.

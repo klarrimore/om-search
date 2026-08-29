@@ -1,9 +1,12 @@
 """Tests for fzf integration — preview, section reading, and actions."""
 
+import json
+
 import pytest
 
-from om_search.index import DocCandidate, CmdCandidate
+from om_search.index import DocCandidate, CmdCandidate, build_index, INDEX_FILENAME
 from om_search.picker import action_for, section_text, picker_header
+from om_search.paths import data_dir
 
 
 # Fixture: a minimal manual dir in a temp XDG_DATA_HOME
@@ -82,6 +85,24 @@ class TestSectionText:
             page_title="", heading="",
         )
         assert section_text(cand) == ""
+
+    def test_reads_from_index_when_present(self):
+        """When index.json exists it wins over on-disk parsing."""
+        mdir = data_dir() / "omarchy-repo" / "manual"
+        # Write a slightly different body into the index to prove it is read
+        (mdir / FIXTURE_FILE).write_text(FIXTURE_CONTENT.replace(
+            "Super + Space opens the Omarchy menu.",
+            "Super + Space opens the INDEXED menu."
+        ))
+        build_index(mdir, data_dir() / INDEX_FILENAME)
+
+        cand = DocCandidate(
+            page_file=FIXTURE_FILE, anchor="navigating",
+            page_title="Navigation", heading="Navigating",
+        )
+        text = section_text(cand)
+        assert "INDEXED menu" in text
+        assert "intro" not in text
 
 
 class TestAction:

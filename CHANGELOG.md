@@ -13,10 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--page <file>` and `--group <name>` flags for scoped search within a specific page or command group. (#5)
 - `--update` flag (replaces the ``update`` subcommand) for refreshing the manual. (#5)
 - Page list and group list helpers exposed from the library layer. (#5)
+- Pre-built JSON index for faster startup and preview rendering. (#7)
+- Body-text matching in fzf search (body excerpts indexed as a fifth candidate field). (#7)
+- Index rebuilt automatically after manual clone and pull. (#7)
+- `build_index` and `load_index` helpers exposed from the index layer. (#7)
 
 ### Changed
 - CLI argument parsing switched to flags (``--docs``, ``--pages``, etc.) instead of subparsers, following the Omarchy CLI convention.  The ``preview`` subcommand remains for fzf integration. (#5)
 - Picker header now reflects the active filter mode and scope. (#5)
+- Sections and previews now read from the pre-built index with fallback to on-disk parsing. (#7)
 
 ## [0.1.0] - 2026-08-18
 

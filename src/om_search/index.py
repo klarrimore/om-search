@@ -1,11 +1,22 @@
 """Building the unified search index from manual sections and CLI commands."""
 
+import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Union, cast
+from pathlib import Path
+from typing import Any, Union, cast
 
 from om_search.commands import Command
-from om_search.manual import Section
+from om_search.manual import Section, parse_manual_file
+
+
+INDEX_VERSION = 1
+INDEX_FILENAME = "index.json"
+BODY_EXCERPT_LENGTH = 150
+
+
+HAS_REAL_CONTENT_RE = re.compile(r"[a-zA-Z0-9]{3,}")
 
 
 @dataclass(frozen=True)
@@ -18,6 +29,7 @@ class DocCandidate:
     page_title: str = ""
     heading: str = ""
     text: str = ""
+    body_excerpt: str = ""
 
 
 @dataclass(frozen=True)
@@ -100,20 +112,100 @@ def build_candidates(
     return _interleave(docs, cmds)
 
 
+def _body_excerpt(text: str, max_len: int = BODY_EXCERPT_LENGTH) -> str:
+    """Flatten first ``max_len`` chars of text for fzf body matching.
+
+    Strips markdown heading markers, collapses whitespace, and truncates.
+    If the excerpt after flattening is too short to be useful, return empty
+    so fzf does not waste time matching tiny noise.
+    """
+    cleaned = re.sub(r"^#+\s+", "", text, flags=re.MULTILINE)
+    flat = " ".join(cleaned.split())
+    if not HAS_REAL_CONTENT_RE.search(flat):
+        return ""
+    return flat[:max_len]
+
+
+def _section_to_dict(section: Section) -> dict[str, Any]:
+    """Convert a Section to a JSON-serialisable dict."""
+    return {
+        "page_file": section.page_file,
+        "page_number": section.page_number,
+        "page_title": section.page_title,
+        "heading": section.heading,
+        "anchor": section.anchor,
+        "text": section.text,
+    }
+
+
+def _section_from_dict(d: dict[str, Any]) -> Section:
+    """Reconstruct a Section from a dict."""
+    return Section(
+        page_file=d["page_file"],
+        page_number=d["page_number"],
+        page_title=d["page_title"],
+        heading=d["heading"],
+        anchor=d["anchor"],
+        text=d["text"],
+    )
+
+
+def build_index(mdir: Path, index_path: Path) -> None:
+    """Parse all manual pages and write a pre-built JSON index.
+
+    The index stores every section (with full text) plus the raw
+    markdown of each page.  Call after cloning or updating the manual.
+    """
+    sections: list[dict[str, Any]] = []
+    page_texts: dict[str, str] = {}
+    for f in sorted(mdir.glob("*.md")):
+        text = f.read_text(encoding="utf-8")
+        page_texts[f.name] = text
+        for section in parse_manual_file(f):
+            sections.append(_section_to_dict(section))
+
+    data = {
+        "version": INDEX_VERSION,
+        "sections": sections,
+        "page_texts": page_texts,
+    }
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_index(index_path: Path) -> tuple[list[Section], dict[str, str]] | None:
+    """Load the pre-built JSON index.
+
+    Returns ``(sections, page_texts)`` on success, ``None`` when the
+    index is missing, corrupt, or has an incompatible version.
+    """
+    if not index_path.exists():
+        return None
+    try:
+        data = json.loads(index_path.read_text(encoding="utf-8"))
+        if data.get("version") != INDEX_VERSION:
+            return None
+        sections = [_section_from_dict(s) for s in data["sections"]]
+        page_texts = data.get("page_texts", {})
+        return sections, page_texts
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return None
+
+
 def render_candidate(cand: Candidate) -> str:
     """Render a candidate as a tab-delimited fzf line.
 
     Field layout (0-indexed)::
 
-        0: type        ("doc" | "cmd")
-        1: page_file   (doc)  | path       (cmd)   -- preview key
-        2: anchor      (doc)  | description (cmd)   -- preview key
-        3: display     human-readable line for the picker
+        0: type        ("doc" | "cmd")               -- preview key
+        1: page_file   (doc) | path       (cmd)       -- preview key
+        2: anchor      (doc) | description (cmd)      -- preview key
+        3: display     human-readable line for picker
+        4: body        (doc) body excerpt for matching | (cmd) empty
 
-    The display text is a single field so ``--with-nth 4`` works for both
-    types.  The full section text is never embedded in the line (it may
-    contain newlines); the preview and action commands read it from the
-    file.
+    ``--with-nth 4`` shows only the display field.  ``--nth 4,5`` makes
+    fzf match against both the heading and the body excerpt, so users
+    can find pages by typing words from the content.
     """
     if cand.type == "doc":
         doc = cast(DocCandidate, cand)
@@ -122,15 +214,19 @@ def render_candidate(cand: Candidate) -> str:
             if doc.heading
             else f"[doc] {doc.page_title}"
         )
-        return "\t".join([cand.type, doc.page_file, doc.anchor, display])
+        excerpt = doc.body_excerpt or _body_excerpt(doc.text)
+        return "\t".join([cand.type, doc.page_file, doc.anchor, display, excerpt])
     else:
         cmd = cast(CmdCandidate, cand)
         display = f"[cmd] {cmd.path}  ::  {cmd.description}"
-        return "\t".join([cand.type, cmd.path, cmd.description, display])
+        return "\t".join([cand.type, cmd.path, cmd.description, display, ""])
 
 
 def parse_fzf_line(line: str) -> Candidate | None:
-    """Parse a rendered fzf line back into its candidate."""
+    """Parse a rendered fzf line back into its candidate.
+
+    Accepts both 4-field (legacy without excerpt) and 5-field lines.
+    """
     fields = line.split("\t")
     if not fields or fields[0] not in ("doc", "cmd"):
         return None
@@ -144,11 +240,13 @@ def parse_fzf_line(line: str) -> Candidate | None:
         elif display.startswith("[cmd] "):
             display = display[6:]
         title, sep, heading = display.partition("  ::  ")
+        excerpt = fields[4] if len(fields) >= 5 else ""
         return DocCandidate(
             page_file=fields[1],
             anchor=fields[2],
             page_title=title,
             heading=heading if sep else "",
+            body_excerpt=excerpt,
         )
     else:
         if len(fields) < 3:
