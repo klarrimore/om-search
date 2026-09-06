@@ -20,11 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Interactive search query (`om-search <term>`) now filters the picker correctly instead of displaying all results — fzf `--nth 4,5` operated on the transformed (single-field) line, making the fields unreachable. (#8)
+- Body-text matching now actually works: the picker presents and searches both the display field and the body excerpt via fzf `--with-nth 4,5`. Previously `--with-nth 4` limited both display and search to the title/heading, so words appearing only in a section body were unfindable. The excerpt is shown dimmed (ANSI) and stripped back off on selection.
 
 ### Changed
 - CLI argument parsing… switched to flags (``--docs``, ``--pages``, etc.) instead of subparsers, following the Omarchy CLI convention.  The ``preview`` subcommand remains for fzf integration. (#5)
 - Picker header now reflects the active filter mode and scope. (#5)
 - Sections and previews now read from the pre-built index with fallback to on-disk parsing. (#7)
+- Doc viewer now renders markdown to ANSI (`glow` → `mdcat` → `bat`) and opens it in an interactive pager (`less -RFX`), instead of piping raw markdown into a pager. Package now depends on `glow` (rendering) and `less` (paging).
 
 ## [0.1.0] - 2026-08-18
 

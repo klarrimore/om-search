@@ -8,7 +8,7 @@ pkgdesc="Search the Omarchy Linux manual and CLI commands from the terminal"
 arch=('any')
 url="https://github.com/klarrimore/om-search"
 license=('MIT')
-depends=('python>=3.12' 'fzf' 'wl-clipboard' 'python-argcomplete')
+depends=('python>=3.12' 'fzf' 'wl-clipboard' 'python-argcomplete' 'glow' 'less')
 makedepends=('python-build' 'python-installer' 'python-wheel')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')
