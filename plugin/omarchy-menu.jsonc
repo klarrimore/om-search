@@ -1,0 +1,73 @@
+{
+  // om-search — Omarchy menu extension
+  //
+  // Adds a "Manual" submenu to the Quickshell Omarchy menu (Super+Space) that
+  // launches om-search in its various modes. Every row is gated on om-search
+  // being installed, so it stays hidden on machines without it.
+  //
+  // This is a complete, valid extension file: if you have no other menu
+  // customizations you can copy it straight to
+  //   ~/.config/omarchy/extensions/omarchy-menu.jsonc
+  // Otherwise run ./install.sh, which merges only the marked block below into
+  // your existing file (backing it up first).
+  //
+  // Field reference (from the Omarchy default extension template):
+  //   icon        Nerd Font glyph shown in the icon column.
+  //   label       Visible row title.
+  //   action      Shell command to run. If omitted, the row is a submenu.
+  //   aliases     Alternate `omarchy menu summon <name>` routes; also searchable.
+  //   description Optional subtitle and extra search text.
+  //   when        Shell condition; hide the row when it fails.
+
+  // >>> om-search (managed by plugin/install.sh — do not edit inside markers) >>>
+  "manual": {
+    "icon": "",
+    "label": "Manual",
+    "description": "Search the Omarchy manual and CLI commands (om-search)",
+    "aliases": ["om-search", "docs", "help", "search manual"],
+    "when": "command -v om-search >/dev/null"
+  },
+  "manual.search": {
+    "icon": "",
+    "label": "Search Everything",
+    "description": "Fuzzy-search manual sections and commands together",
+    "action": "omarchy-launch-tui om-search",
+    "when": "command -v om-search >/dev/null"
+  },
+  "manual.docs": {
+    "icon": "",
+    "label": "Search Docs",
+    "description": "Search the manual documentation only",
+    "action": "omarchy-launch-tui om-search --docs",
+    "when": "command -v om-search >/dev/null"
+  },
+  "manual.cmds": {
+    "icon": "",
+    "label": "Search Commands",
+    "description": "Search the omarchy CLI command tree only",
+    "action": "omarchy-launch-tui om-search --cmds",
+    "when": "command -v om-search >/dev/null"
+  },
+  "manual.pages": {
+    "icon": "",
+    "label": "Browse Pages",
+    "description": "Pick a manual page, then search within it",
+    "action": "omarchy-launch-tui om-search --pages",
+    "when": "command -v om-search >/dev/null"
+  },
+  "manual.groups": {
+    "icon": "",
+    "label": "Browse Command Groups",
+    "description": "Pick a command group, then search within it",
+    "action": "omarchy-launch-tui om-search --groups",
+    "when": "command -v om-search >/dev/null"
+  },
+  "manual.update": {
+    "icon": "",
+    "label": "Update Manual",
+    "description": "Pull the latest manual and re-index commands",
+    "action": "omarchy-launch-floating-terminal-with-presentation om-search --update",
+    "when": "command -v om-search >/dev/null"
+  },
+  // <<< om-search <<<
+}
