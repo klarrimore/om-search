@@ -15,6 +15,13 @@ INDEX_VERSION = 1
 INDEX_FILENAME = "index.json"
 BODY_EXCERPT_LENGTH = 150
 
+# The body excerpt is shown dimmed in the picker so the title/heading stays
+# prominent while the excerpt remains fuzzy-matchable (fzf --ansi matches
+# against the text with these codes stripped).
+_DIM = "\x1b[2m"
+_RESET = "\x1b[0m"
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
 
 HAS_REAL_CONTENT_RE = re.compile(r"[a-zA-Z0-9]{3,}")
 
@@ -203,9 +210,11 @@ def render_candidate(cand: Candidate) -> str:
         3: display     human-readable line for picker
         4: body        (doc) body excerpt for matching | (cmd) empty
 
-    ``--with-nth 4`` shows only the display field.  fzf then searches
-    the transformed line (field 4 — the full display text), so users
-    can find pages by typing words from the heading or title.
+    The picker runs with ``--with-nth 4,5``, so fzf both displays and
+    searches the display field (4) and the dimmed body excerpt (5) — this
+    is what makes doc bodies discoverable, since fzf can only match text it
+    presents. The excerpt is wrapped in dim ANSI so the heading/title stays
+    prominent; ``parse_fzf_line`` strips those codes back off.
     """
     if cand.type == "doc":
         doc = cast(DocCandidate, cand)
@@ -215,7 +224,8 @@ def render_candidate(cand: Candidate) -> str:
             else f"[doc] {doc.page_title}"
         )
         excerpt = doc.body_excerpt or _body_excerpt(doc.text)
-        return "\t".join([cand.type, doc.page_file, doc.anchor, display, excerpt])
+        shown = f"{_DIM}{excerpt}{_RESET}" if excerpt else ""
+        return "\t".join([cand.type, doc.page_file, doc.anchor, display, shown])
     else:
         cmd = cast(CmdCandidate, cand)
         display = f"[cmd] {cmd.path}  ::  {cmd.description}"
@@ -240,7 +250,7 @@ def parse_fzf_line(line: str) -> Candidate | None:
         elif display.startswith("[cmd] "):
             display = display[6:]
         title, sep, heading = display.partition("  ::  ")
-        excerpt = fields[4] if len(fields) >= 5 else ""
+        excerpt = _ANSI_RE.sub("", fields[4]) if len(fields) >= 5 else ""
         return DocCandidate(
             page_file=fields[1],
             anchor=fields[2],

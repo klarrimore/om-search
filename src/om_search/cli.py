@@ -18,7 +18,12 @@ from om_search.index import (
 )
 from om_search.manual import Section, list_pages, parse_manual_file
 from om_search.paths import data_dir, repo_dir, manual_dir
-from om_search.picker import action_for, run_fzf, run_simple_fzf
+from om_search.picker import (
+    action_for,
+    run_fzf,
+    run_simple_fzf,
+    view_markdown,
+)
 from om_search.update import ensure_manual, update_manual
 
 
@@ -196,11 +201,11 @@ def cmd_picker(
     if cand is None:
         return 0
 
-    pager, payload = action_for(cand)
-    if pager == "echo":
+    kind, payload = action_for(cand)
+    if kind == "echo":
         print(payload)
     else:
-        subprocess.run([pager], input=payload.encode(), check=False)
+        view_markdown(payload)
     return 0
 
 

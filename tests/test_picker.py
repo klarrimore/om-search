@@ -1,11 +1,13 @@
 """Tests for fzf integration — preview, section reading, and actions."""
 
 import json
+import types
 
 import pytest
 
+import om_search.picker as picker
 from om_search.index import DocCandidate, CmdCandidate, build_index, INDEX_FILENAME
-from om_search.picker import action_for, section_text, picker_header
+from om_search.picker import action_for, section_text, picker_header, run_fzf
 from om_search.paths import data_dir
 
 
@@ -105,14 +107,33 @@ class TestSectionText:
         assert "intro" not in text
 
 
+class TestRunFzf:
+    def test_search_scope_includes_body_excerpt_field(self, monkeypatch):
+        """Regression: fzf must search field 5 (body excerpt), not just the
+        display field, or doc bodies become undiscoverable. fzf only matches
+        text it presents, so --with-nth must include both 4 and 5."""
+        captured = {}
+
+        def fake_run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            return types.SimpleNamespace(stdout="")
+
+        monkeypatch.setattr("om_search.picker.subprocess.run", fake_run)
+        run_fzf(["doc\ta.md\tanchor\t[doc] Title\tbody words here"])
+
+        cmd = captured["cmd"]
+        assert "--with-nth" in cmd
+        assert cmd[cmd.index("--with-nth") + 1] == "4,5"
+
+
 class TestAction:
-    def test_action_picks_pager_and_text_for_doc(self):
+    def test_action_returns_view_and_text_for_doc(self):
         cand = DocCandidate(
             page_file=FIXTURE_FILE, anchor="navigating",
             page_title="Navigation", heading="Navigating",
         )
-        pager, text = action_for(cand)
-        assert pager in ("glow", "less", "cat")
+        kind, text = action_for(cand)
+        assert kind == "view"
         assert "Super + Space" in text
 
     def test_action_echoes_command_for_cmd(self):
@@ -120,6 +141,34 @@ class TestAction:
             path="omarchy capture screenshot",
             description="Take a screenshot",
         )
-        pager, text = action_for(cand)
-        assert pager == "echo"
+        kind, text = action_for(cand)
+        assert kind == "echo"
         assert text == "omarchy capture screenshot"
+
+
+class TestRenderMarkdown:
+    def test_returns_raw_text_when_no_renderer(self, monkeypatch):
+        """With no renderer on PATH, the text passes through unchanged."""
+        monkeypatch.setattr(picker.shutil, "which", lambda _: None)
+        assert picker.render_markdown("# Hi\n\nbody") == "# Hi\n\nbody"
+
+    def test_prefers_glow_and_returns_its_output(self, monkeypatch):
+        monkeypatch.setattr(picker.shutil, "which",
+                            lambda name: "/usr/bin/glow" if name == "glow" else None)
+        calls = {}
+
+        def fake_run(cmd, **kwargs):
+            calls["cmd"] = cmd
+            return types.SimpleNamespace(returncode=0, stdout="RENDERED")
+
+        monkeypatch.setattr(picker.subprocess, "run", fake_run)
+        out = picker.render_markdown("# Hi")
+        assert out == "RENDERED"
+        assert calls["cmd"][0] == "glow"
+
+    def test_view_markdown_writes_when_not_a_tty(self, monkeypatch, capsys):
+        """No TTY -> render straight to stdout instead of paging."""
+        monkeypatch.setattr(picker.shutil, "which", lambda _: None)
+        monkeypatch.setattr(picker.sys.stdout, "isatty", lambda: False)
+        picker.view_markdown("plain body")
+        assert "plain body" in capsys.readouterr().out

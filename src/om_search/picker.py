@@ -2,6 +2,7 @@
 
 import shutil
 import subprocess
+import sys
 from typing import cast
 
 from om_search.index import (
@@ -51,21 +52,63 @@ def section_text(cand: DocCandidate) -> str:
 
 
 def action_for(cand: Candidate) -> tuple[str, str]:
-    """Return (command, payload) to run once the user selects a candidate.
+    """Return (kind, payload) for a selected candidate.
 
-    Doc candidates open with a markdown viewer (glow) or fall back to less.
-    Command candidates print the command string to stdout.
+    ``doc`` -> ``("view", markdown)``  — rendered and paged by
+    :func:`view_markdown`.
+    ``cmd`` -> ``("echo", path)``       — printed to stdout for the shell.
     """
     if cand.type == "doc":
-        text = section_text(cast(DocCandidate, cand))
-        if shutil.which("glow"):
-            return ("glow", text)
-        if shutil.which("less"):
-            return ("less", text)
-        return ("cat", text)
-    else:
-        cmd = cast(CmdCandidate, cand)
-        return ("echo", cmd.path)
+        return ("view", section_text(cast(DocCandidate, cand)))
+    cmd = cast(CmdCandidate, cand)
+    return ("echo", cmd.path)
+
+
+def render_markdown(text: str) -> str:
+    """Render markdown to ANSI using the best renderer available.
+
+    Prefers true-markdown renderers (glow, mdcat) that style headings, lists
+    and code; falls back to syntax-highlighted source (bat); finally returns
+    the text unchanged. Never raises — a failing renderer is skipped.
+    """
+    renderers = [
+        ["glow", "-s", "auto", "-"],
+        ["mdcat", "--ansi", "-"],
+        ["bat", "--language=md", "--color=always", "--paging=never",
+         "--decorations=never", "-"],
+    ]
+    for cmd in renderers:
+        if not shutil.which(cmd[0]):
+            continue
+        try:
+            result = subprocess.run(
+                cmd, input=text, capture_output=True, text=True
+            )
+        except OSError:
+            continue
+        if result.returncode == 0 and result.stdout:
+            return result.stdout
+    return text
+
+
+def view_markdown(text: str) -> None:
+    """Render markdown and show it in an interactive pager when possible.
+
+    Renders with :func:`render_markdown`, then pages through ``less -R`` so
+    the output is both pretty and scrollable/searchable. ``-F`` prints
+    directly (no pager) when the content fits one screen; ``-X`` keeps it in
+    the scrollback. Falls back to writing to stdout when there is no TTY or
+    no ``less``.
+    """
+    rendered = render_markdown(text)
+    if sys.stdout.isatty() and shutil.which("less"):
+        subprocess.run(
+            ["less", "-R", "-F", "-X"], input=rendered.encode(), check=False
+        )
+        return
+    if not rendered.endswith("\n"):
+        rendered += "\n"
+    sys.stdout.write(rendered)
 
 
 def picker_header(
@@ -101,8 +144,9 @@ def run_fzf(
     """Run fzf over the rendered candidates, returning the selected line.
 
     Returns None when the user cancels (no selection).
-    Field 3 is displayed; fields 3 and 4 are both searched so body
-    content is discoverable.
+    Fields 4 (display) and 5 (dimmed body excerpt) are both presented and
+    searched via ``--with-nth 4,5`` so body content is discoverable — fzf
+    only matches text it presents, so the excerpt must be shown to be found.
     """
     preview_cmd = "om-search preview {2} {3}"
 
@@ -112,10 +156,10 @@ def run_fzf(
         "--ansi",
         "--delimiter",
         "\t",
-        	"--with-nth",
-	"4",
-	"--preview",
-	preview_cmd,
+        "--with-nth",
+        "4,5",
+        "--preview",
+        preview_cmd,
         "--preview-window",
         "right:60%:wrap",
         "--bind",
