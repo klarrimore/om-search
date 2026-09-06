@@ -5,6 +5,7 @@ import subprocess
 import sys
 from typing import cast
 
+from om_search.config import Config, load_config
 from om_search.index import (
     Candidate,
     CmdCandidate,
@@ -13,7 +14,8 @@ from om_search.index import (
     load_index,
 )
 from om_search.manual import parse_manual_file
-from om_search.paths import data_dir, manual_dir
+from om_search.paths import config_path, data_dir, manual_dir
+from om_search.theme import fzf_color_spec, resolve_palette
 
 
 def section_text(cand: DocCandidate) -> str:
@@ -134,12 +136,79 @@ def picker_header(
     return f"Mode: {scope}  |  Enter: open  |  Ctrl-Y: copy command"
 
 
+# Friendly labels for the help cheatsheet, in display order.
+_KEY_LABELS: list[tuple[str, str]] = [
+    ("down", "Move down"),
+    ("up", "Move up"),
+    ("half_page_down", "Half page down"),
+    ("half_page_up", "Half page up"),
+    ("preview_down", "Preview scroll down"),
+    ("preview_up", "Preview scroll up"),
+    ("open", "Open selection"),
+    ("copy", "Copy command"),
+    ("help", "Show this help"),
+]
+
+
+def _fmt_key(key: str) -> str:
+    """Render an fzf key name the way herdr shows chords: ``Ctrl + J``."""
+    return " + ".join(part.capitalize() for part in key.split("-"))
+
+
+def keys_cheatsheet(cfg: Config | None = None) -> str:
+    """Return a plain-text keybinding cheatsheet for the help overlay."""
+    cfg = cfg or load_config()
+    lines = ["om-search — keybindings", ""]
+    for action, label in _KEY_LABELS:
+        key = cfg.keys.get(action, "")
+        if not key:
+            continue
+        lines.append(f"  {label:<20} {_fmt_key(key)}")
+    lines += [
+        "  Quit                 Esc",
+        "",
+        "Type to fuzzy-search titles and body text.",
+        f"Rebind in {config_path()}",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _base_fzf_args(cfg: Config) -> list[str]:
+    """Shared themed/bordered flags and navigation binds (herdr-like look)."""
+    args = [
+        "--layout=reverse",
+        "--border=rounded",
+        "--border-label= om-search ",
+        "--prompt=  ",
+        "--pointer=▶",
+        "--marker=✓",
+        "--info=inline",
+    ]
+    palette = resolve_palette(cfg.theme_source, cfg.theme_custom)
+    if palette:
+        spec = fzf_color_spec(palette)
+        if spec:
+            args += ["--color", spec]
+    for bind in cfg.movement_binds():
+        args += ["--bind", bind]
+    return args
+
+
+def _nav_hint(cfg: Config) -> str:
+    """A compact second header line advertising the vim-style navigation."""
+    down = _fmt_key(cfg.keys.get("down", "ctrl-j"))
+    up = _fmt_key(cfg.keys.get("up", "ctrl-k"))
+    help_key = cfg.keys.get("help", "?")
+    return f"{down}/{up} move · Enter open · {help_key} keys · Esc quit"
+
+
 def run_fzf(
     candidates: list[str],
     query: str = "",
     mode: str = "all",
     page_filter: str | None = None,
     group_filter: str | None = None,
+    cfg: Config | None = None,
 ) -> str | None:
     """Run fzf over the rendered candidates, returning the selected line.
 
@@ -147,11 +216,15 @@ def run_fzf(
     Fields 4 (display) and 5 (dimmed body excerpt) are both presented and
     searched via ``--with-nth 4,5`` so body content is discoverable — fzf
     only matches text it presents, so the excerpt must be shown to be found.
+    The UI is themed to the active Omarchy theme and keys come from config.
     """
+    cfg = cfg or load_config()
     preview_cmd = "om-search preview {2} {3}"
+    header = f"{picker_header(mode, page_filter, group_filter)}\n{_nav_hint(cfg)}"
 
-    cmd = [
-        "fzf",
+    cmd = ["fzf"]
+    cmd += _base_fzf_args(cfg)
+    cmd += [
         "--tiebreak=begin,end",
         "--ansi",
         "--delimiter",
@@ -161,12 +234,20 @@ def run_fzf(
         "--preview",
         preview_cmd,
         "--preview-window",
-        "right:60%:wrap",
-        "--bind",
-        "ctrl-y:execute-silent(echo -n {2} | wl-copy)+accept",
+        "right:60%:wrap:border-rounded",
         "--header",
-        picker_header(mode, page_filter, group_filter),
+        header,
     ]
+
+    copy = cfg.keys.get("copy")
+    if copy:
+        cmd += ["--bind", f"{copy}:execute-silent(echo -n {{2}} | wl-copy)+accept"]
+    help_key = cfg.keys.get("help")
+    if help_key:
+        # Show the cheatsheet in the preview pane; moving the selection
+        # re-runs --preview and restores the doc, giving a natural toggle.
+        cmd += ["--bind", f"{help_key}:change-preview(om-search --keys)"]
+
     if query:
         cmd.extend(["--query", query])
 
@@ -184,15 +265,15 @@ def run_simple_fzf(
     items: list[str],
     header: str = "",
     query: str = "",
+    cfg: Config | None = None,
 ) -> str | None:
     """Run fzf over a simple list of strings (no tab-delimited fields).
 
-    Returns the selected line, or None on cancel.
+    Returns the selected line, or None on cancel. Themed to match the picker.
     """
-    cmd = [
-        "fzf",
-        "--tiebreak=end",
-    ]
+    cfg = cfg or load_config()
+    cmd = ["fzf", "--tiebreak=end"]
+    cmd += _base_fzf_args(cfg)
     if header:
         cmd.extend(["--header", header])
     if query:

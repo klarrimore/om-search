@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Body-text matching in fzf search (body excerpts indexed as a fifth candidate field). (#7)
 - Index rebuilt automatically after manual clone and pull. (#7)
 - `build_index` and `load_index` helpers exposed from the index layer. (#7)
+- herdr-style TUI: rounded bordered layout, vim-style navigation (`Ctrl-J`/`Ctrl-K`, half-page and preview scroll), and a `?` help overlay rendered in the preview pane.
+- Picker colours follow the active Omarchy theme (parsed from the theme's `colors.toml`) and re-theme on theme switch; `catppuccin` and `none` sources also available.
+- TOML configuration at `~/.config/om-search/config.toml` with `[theme]` and `[keys]` tables. New `--init-config` (write a starter config) and `--keys` (print the keybindings) flags.
 
 ### Fixed
 - Interactive search query (`om-search <term>`) now filters the picker correctly instead of displaying all results — fzf `--nth 4,5` operated on the transformed (single-field) line, making the fields unreachable. (#8)

@@ -18,8 +18,10 @@ from om_search.index import (
 )
 from om_search.manual import Section, list_pages, parse_manual_file
 from om_search.paths import data_dir, repo_dir, manual_dir
+from om_search.config import write_default_config
 from om_search.picker import (
     action_for,
+    keys_cheatsheet,
     run_fzf,
     run_simple_fzf,
     view_markdown,
@@ -349,6 +351,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Print shell completion setup and exit",
     )
+    parser.add_argument(
+        "--keys",
+        action="store_true",
+        default=False,
+        help="Print the keybinding cheatsheet and exit",
+    )
+    parser.add_argument(
+        "--init-config",
+        action="store_true",
+        default=False,
+        help="Write a default config to ~/.config/om-search/config.toml and exit",
+    )
     return parser
 
 
@@ -370,6 +384,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.completion:
         print("Add to ~/.bashrc or ~/.zshrc:")
         print('  eval "$(register-python-argcomplete om-search)"')
+        return 0
+
+    if args.keys:
+        print(keys_cheatsheet(), end="")
+        return 0
+
+    if args.init_config:
+        path = write_default_config()
+        print(f"Config at {path}")
         return 0
 
     if args.update:

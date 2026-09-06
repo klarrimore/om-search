@@ -6,6 +6,7 @@ import types
 import pytest
 
 import om_search.picker as picker
+from om_search.config import Config
 from om_search.index import DocCandidate, CmdCandidate, build_index, INDEX_FILENAME
 from om_search.picker import action_for, section_text, picker_header, run_fzf
 from om_search.paths import data_dir
@@ -108,22 +109,39 @@ class TestSectionText:
 
 
 class TestRunFzf:
-    def test_search_scope_includes_body_excerpt_field(self, monkeypatch):
-        """Regression: fzf must search field 5 (body excerpt), not just the
-        display field, or doc bodies become undiscoverable. fzf only matches
-        text it presents, so --with-nth must include both 4 and 5."""
+    @staticmethod
+    def _capture(monkeypatch, **kwargs):
         captured = {}
 
-        def fake_run(cmd, **kwargs):
+        def fake_run(cmd, **_):
             captured["cmd"] = cmd
             return types.SimpleNamespace(stdout="")
 
         monkeypatch.setattr("om_search.picker.subprocess.run", fake_run)
-        run_fzf(["doc\ta.md\tanchor\t[doc] Title\tbody words here"])
+        # theme_source="none" keeps the test off the real filesystem palette
+        cfg = Config(theme_source="none")
+        run_fzf(["doc\ta.md\tanchor\t[doc] Title\tbody words here"], cfg=cfg, **kwargs)
+        return captured["cmd"]
 
-        cmd = captured["cmd"]
+    def test_search_scope_includes_body_excerpt_field(self, monkeypatch):
+        """Regression: fzf must search field 5 (body excerpt), not just the
+        display field, or doc bodies become undiscoverable."""
+        cmd = self._capture(monkeypatch)
         assert "--with-nth" in cmd
         assert cmd[cmd.index("--with-nth") + 1] == "4,5"
+
+    def test_is_bordered_and_reverse_layout(self, monkeypatch):
+        cmd = self._capture(monkeypatch)
+        assert "--border=rounded" in cmd
+        assert "--layout=reverse" in cmd
+
+    def test_movement_and_help_binds_from_config(self, monkeypatch):
+        cmd = self._capture(monkeypatch)
+        binds = [cmd[i + 1] for i, a in enumerate(cmd) if a == "--bind"]
+        assert "ctrl-j:down" in binds
+        assert "ctrl-k:up" in binds
+        assert any(b.startswith("?:change-preview") for b in binds)
+        assert any(b.startswith("ctrl-y:") for b in binds)
 
 
 class TestAction:

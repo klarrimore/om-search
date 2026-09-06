@@ -66,6 +66,47 @@ with `--page` or `--group`.
 The `--pages` and `--groups` flags open a page/group browser (also fzf).
 Picking a result launches a picker scoped to that page or group.
 
+## Appearance and keybindings
+
+The picker follows a herdr-style TUI: a rounded, bordered layout whose colours
+track the **active Omarchy theme** (read from the theme's `colors.toml`, so it
+re-themes when you switch themes), with vim-style navigation and a `?` help
+overlay.
+
+Default keys (all configurable):
+
+| Key | Action |
+| --- | --- |
+| `Ctrl-J` / `Ctrl-K` | move down / up |
+| `Ctrl-D` / `Ctrl-U` | half page down / up |
+| `Ctrl-F` / `Ctrl-B` | scroll the preview |
+| `Enter` | open the selection |
+| `Ctrl-Y` | copy a command to the clipboard |
+| `?` | show the keybindings (in the preview pane) |
+| `Esc` | quit |
+
+Plain letters still go to the fuzzy query — a fuzzy finder can't use bare
+`j`/`k` for movement, so the vim navigation is on `Ctrl` chords.
+
+Configure theme and keys in `~/.config/om-search/config.toml` (herdr-style
+`[theme]` and `[keys]` tables):
+
+```sh
+om-search --init-config   # write a commented starter config
+om-search --keys          # print the current keybindings
+```
+
+```toml
+[theme]
+# "omarchy" (default, follow active theme) | "catppuccin" | "none"
+source = "omarchy"
+
+[keys]
+down = "ctrl-j"
+up = "ctrl-k"
+help = "?"
+```
+
 ## How it works
 
 The manual is cloned shallowly and sparsely into the XDG data dir

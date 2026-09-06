@@ -20,3 +20,20 @@ def repo_dir() -> Path:
 def manual_dir() -> Path:
     """Return the path to the manual files inside the cloned repo."""
     return repo_dir() / "manual"
+
+
+def config_dir() -> Path:
+    """Return the om-search config directory (not created here)."""
+    xdg = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return Path(xdg) / "om-search"
+
+
+def config_path() -> Path:
+    """Return the path to the user config file (may not exist)."""
+    return config_dir() / "config.toml"
+
+
+def active_theme_dir() -> Path:
+    """Return the active Omarchy theme directory (a symlink, may not exist)."""
+    xdg = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+    return Path(xdg) / "omarchy" / "current" / "theme"
