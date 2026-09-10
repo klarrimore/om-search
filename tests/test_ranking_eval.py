@@ -28,6 +28,9 @@ def test_ranking_eval_expected_result_is_first():
         elif isinstance(top, CmdCandidate):
             assert top.path == case["expected_path"], case["query"]
 
+        if "max_results" in case:
+            assert len(candidates) <= case["max_results"], case["query"]
+
 
 def _section(item: dict[str, Any]) -> Section:
     return Section(

@@ -17,6 +17,14 @@
       "text": "## Screenshot\n\nCapture a screenshot or recording from the capture menu."
     },
     {
+      "page_file": "30-user-interface.md",
+      "page_number": 30,
+      "page_title": "User Interface",
+      "heading": "Herdr-style search",
+      "anchor": "herdr-style-search",
+      "text": "## Herdr-style search\n\nThe picker uses herdr-style navigation."
+    },
+    {
       "page_file": "32-clipboard.md",
       "page_number": 32,
       "page_title": "Clipboard",
@@ -52,6 +60,12 @@
       "query": "keybindings",
       "expected_type": "doc",
       "expected_page_file": "04-navigation.md"
+    },
+    {
+      "query": "herdr",
+      "expected_type": "doc",
+      "expected_page_file": "30-user-interface.md",
+      "max_results": 1
     },
     {
       "query": "clipboard",

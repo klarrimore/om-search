@@ -139,11 +139,13 @@ def rank_candidates(candidates: Sequence[Candidate], query: str) -> list[Candida
     if not terms:
         return list(candidates)
 
-    return sorted(
-        candidates,
-        key=lambda cand: _rank_key(cand, " ".join(terms), terms),
-        reverse=True,
-    )
+    scored = [
+        (_rank_key(cand, " ".join(terms), terms), cand)
+        for cand in candidates
+    ]
+    matches = [(key, cand) for key, cand in scored if key[0] > 0]
+    pool = matches or scored
+    return [cand for _, cand in sorted(pool, key=lambda item: item[0], reverse=True)]
 
 
 def _query_terms(query: str) -> list[str]:

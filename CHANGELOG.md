@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Interactive search query (`om-search <term>`) now filters the picker correctly instead of displaying all results — fzf `--nth 4,5` operated on the transformed (single-field) line, making the fields unreachable. (#8)
 - Body-text matching now actually works: the picker presents and searches both the display field and the body excerpt via fzf `--with-nth 4,5`. Previously `--with-nth 4` limited both display and search to the title/heading, so words appearing only in a section body were unfindable. The excerpt is shown dimmed (ANSI) and stripped back off on selection.
+- Initial search queries now filter out unrelated zero-score candidates when direct matches exist, preventing broad fuzzy matches like `herdr` from flooding the picker.
 
 ### Changed
 - CLI argument parsing… switched to flags (``--docs``, ``--pages``, etc.) instead of subparsers, following the Omarchy CLI convention.  The ``preview`` subcommand remains for fzf integration. (#5)

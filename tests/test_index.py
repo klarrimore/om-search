@@ -122,6 +122,50 @@ def test_build_candidates_ranks_exact_command_path_before_doc_body_match():
     assert candidates[0].path == "omarchy capture screenshot"
 
 
+def test_build_candidates_filters_unrelated_results_when_query_has_matches():
+    sections = [
+        Section(
+            page_file="30-user-interface.md",
+            page_number=30,
+            page_title="User Interface",
+            heading="Herdr-style search",
+            anchor="herdr-style-search",
+            text="## Herdr-style search\n\nThe picker uses herdr-style navigation.",
+        ),
+        Section(
+            page_file="04-navigation.md",
+            page_number=4,
+            page_title="Navigation",
+            heading="Windows",
+            anchor="windows",
+            text="## Windows\n\nMove focus between windows.",
+        ),
+        Section(
+            page_file="12-screenshots-recording.md",
+            page_number=12,
+            page_title="Screenshots & Recording",
+            heading="Recording",
+            anchor="recording",
+            text="## Recording\n\nCapture the screen.",
+        ),
+    ]
+    commands = [
+        Command(
+            group="theme",
+            name="list",
+            path="omarchy theme list",
+            description="List installed themes",
+        )
+    ]
+
+    candidates = build_candidates(sections, commands, query="herdr")
+
+    assert [c.page_file for c in candidates if c.type == "doc"] == [
+        "30-user-interface.md"
+    ]
+    assert [c for c in candidates if c.type == "cmd"] == []
+
+
 class TestBuildMode:
     def test_doc_mode_excludes_commands(self):
         sections = [
