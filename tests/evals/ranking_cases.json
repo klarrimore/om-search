@@ -1,0 +1,67 @@
+{
+  "sections": [
+    {
+      "page_file": "04-navigation.md",
+      "page_number": 4,
+      "page_title": "Navigation",
+      "heading": "Keybindings",
+      "anchor": "keybindings",
+      "text": "## Keybindings\n\nCustomize shortcuts in bindings.lua."
+    },
+    {
+      "page_file": "12-screenshots-recording.md",
+      "page_number": 12,
+      "page_title": "Screenshots & Recording",
+      "heading": "Screenshot",
+      "anchor": "screenshot",
+      "text": "## Screenshot\n\nCapture a screenshot or recording from the capture menu."
+    },
+    {
+      "page_file": "32-clipboard.md",
+      "page_number": 32,
+      "page_title": "Clipboard",
+      "heading": "Clipboard",
+      "anchor": "clipboard",
+      "text": "## Clipboard\n\nCopy and paste between apps with the current clipboard tools."
+    },
+    {
+      "page_file": "42-advanced.md",
+      "page_number": 42,
+      "page_title": "Advanced Troubleshooting",
+      "heading": "Recovering Input",
+      "anchor": "recovering-input",
+      "text": "## Recovering Input\n\nIf keybindings stop responding, reload Hyprland."
+    }
+  ],
+  "commands": [
+    {
+      "group": "capture",
+      "name": "screenshot",
+      "path": "omarchy capture screenshot",
+      "description": "Take a screenshot"
+    },
+    {
+      "group": "theme",
+      "name": "list",
+      "path": "omarchy theme list",
+      "description": "List installed themes"
+    }
+  ],
+  "cases": [
+    {
+      "query": "keybindings",
+      "expected_type": "doc",
+      "expected_page_file": "04-navigation.md"
+    },
+    {
+      "query": "clipboard",
+      "expected_type": "doc",
+      "expected_page_file": "32-clipboard.md"
+    },
+    {
+      "query": "omarchy capture screenshot",
+      "expected_type": "cmd",
+      "expected_path": "omarchy capture screenshot"
+    }
+  ]
+}

@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - herdr-style TUI: rounded bordered layout, vim-style navigation (`Ctrl-J`/`Ctrl-K`, half-page and preview scroll), and a `?` help overlay rendered in the preview pane.
 - Picker colours follow the active Omarchy theme (parsed from the theme's `colors.toml`) and re-theme on theme switch; `catppuccin` and `none` sources also available.
 - TOML configuration at `~/.config/om-search/config.toml` with `[theme]` and `[keys]` tables. New `--init-config` (write a starter config) and `--keys` (print the keybindings) flags.
+- Ranking eval fixture covering first-result relevance and newest-manual-page tie-break behavior.
+- Omarchy menu plugin that adds om-search launchers to the Quickshell menu.
 
 ### Fixed
 - Interactive search query (`om-search <term>`) now filters the picker correctly instead of displaying all results — fzf `--nth 4,5` operated on the transformed (single-field) line, making the fields unreachable. (#8)
@@ -30,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Picker header now reflects the active filter mode and scope. (#5)
 - Sections and previews now read from the pre-built index with fallback to on-disk parsing. (#7)
 - Doc viewer now renders markdown to ANSI (`glow` → `mdcat` → `bat`) and opens it in an interactive pager (`less -RFX`), instead of piping raw markdown into a pager. Package now depends on `glow` (rendering) and `less` (paging).
+- Arch packaging now depends on `arch-wiki-lite`; `arch-wiki-docs` is optional for `wiki-search-html` instead of being required.
+- Initial search queries now pre-rank candidates so exact title, heading, and command-path matches appear before weaker body matches, with newer manual pages first when relevance ties.
 
 ## [0.1.0] - 2026-08-18
 

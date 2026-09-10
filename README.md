@@ -21,7 +21,17 @@ yay -S om-search
 paru -S om-search
 ```
 
+The Arch package depends on `arch-wiki-lite` for local Arch Wiki text search.
+The larger `arch-wiki-docs` HTML dump is optional and only needed for
+`wiki-search-html`.
+
 ### PyPI
+
+Requires `uv`:
+
+```sh
+sudo pacman -S --needed uv
+```
 
 ```sh
 uv tool install om-search
@@ -32,6 +42,7 @@ pip install om-search
 ### From source
 
 ```sh
+sudo pacman -S --needed uv
 git clone https://github.com/klarrimore/om-search.git
 cd om-search
 uv build
@@ -122,6 +133,7 @@ with the installed release.
 ## Development
 
 ```sh
+sudo pacman -S --needed uv
 uv sync --extra dev
 uv run pytest
 uv run mypy src/
@@ -133,6 +145,10 @@ The `packaging/` directory contains:
 
 - **PKGBUILD** -- Arch Linux / AUR package recipe
 - **om-search.hook** -- pacman hook that refreshes the doc index after an `omarchy` package upgrade
+
+The AUR package intentionally uses `arch-wiki-lite` instead of the larger
+`arch-wiki-docs` package. Install `arch-wiki-docs` only when browser-style
+offline HTML lookup via `wiki-search-html` is needed.
 
 ## License
 

@@ -45,6 +45,83 @@ def test_build_candidates_sections_and_commands():
     assert cmds[0].path == "omarchy capture screenshot"
 
 
+def test_build_candidates_ranks_exact_heading_match_before_newer_body_match():
+    sections = [
+        Section(
+            page_file="04-navigation.md",
+            page_number=4,
+            page_title="Navigation",
+            heading="Keybindings",
+            anchor="keybindings",
+            text="## Keybindings\n\nCustomize shortcuts in bindings.lua.",
+        ),
+        Section(
+            page_file="42-advanced.md",
+            page_number=42,
+            page_title="Advanced",
+            heading="Troubleshooting",
+            anchor="troubleshooting",
+            text="## Troubleshooting\n\nIf keybindings stop responding, reload Hyprland.",
+        ),
+    ]
+
+    candidates = build_candidates(sections, [], query="keybindings")
+
+    assert candidates[0].page_file == "04-navigation.md"
+    assert candidates[0].heading == "Keybindings"
+
+
+def test_build_candidates_ranks_newer_manual_section_first_when_relevance_ties():
+    sections = [
+        Section(
+            page_file="04-navigation.md",
+            page_number=4,
+            page_title="Navigation",
+            heading="Clipboard",
+            anchor="clipboard",
+            text="## Clipboard\n\nCopy and paste between apps.",
+        ),
+        Section(
+            page_file="32-clipboard.md",
+            page_number=32,
+            page_title="Clipboard",
+            heading="Clipboard",
+            anchor="clipboard",
+            text="## Clipboard\n\nCopy and paste between apps with the current tools.",
+        ),
+    ]
+
+    candidates = build_candidates(sections, [], query="clipboard")
+
+    assert candidates[0].page_file == "32-clipboard.md"
+
+
+def test_build_candidates_ranks_exact_command_path_before_doc_body_match():
+    sections = [
+        Section(
+            page_file="12-screenshots-recording.md",
+            page_number=12,
+            page_title="Screenshots & Recording",
+            heading="Screenshot",
+            anchor="screenshot",
+            text="## Screenshot\n\nThe screenshot command captures an area.",
+        ),
+    ]
+    commands = [
+        Command(
+            group="capture",
+            name="screenshot",
+            path="omarchy capture screenshot",
+            description="Take a screenshot",
+        )
+    ]
+
+    candidates = build_candidates(sections, commands, query="omarchy capture screenshot")
+
+    assert candidates[0].type == "cmd"
+    assert candidates[0].path == "omarchy capture screenshot"
+
+
 class TestBuildMode:
     def test_doc_mode_excludes_commands(self):
         sections = [

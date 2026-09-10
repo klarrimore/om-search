@@ -188,7 +188,14 @@ def cmd_picker(
     mdir = _ensure_manual()
     sections = _load_sections(mdir)
     commands = find_commands()
-    candidates = build_candidates(sections, commands, mode, page_filter, group_filter)
+    candidates = build_candidates(
+        sections,
+        commands,
+        mode,
+        page_filter,
+        group_filter,
+        query,
+    )
     lines = [render_candidate(c) for c in candidates]
 
     if not lines:

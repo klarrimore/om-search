@@ -27,6 +27,7 @@ in `docs/adr/`. Read before exploring or editing code. See
 
 ## Development workflow
 
+- Install uv: `sudo pacman -S --needed uv`
 - Provision: `uv sync --extra dev`
 - Tests: `uv run pytest`
 - Type check: `uv run mypy src/`

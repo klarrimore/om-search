@@ -78,6 +78,7 @@ def build_candidates(
     mode: str = "all",
     page_filter: str | None = None,
     group_filter: str | None = None,
+    query: str = "",
 ) -> list[Candidate]:
     """Merge manual sections and CLI commands into a single candidate list.
 
@@ -93,6 +94,10 @@ def build_candidates(
         If set, only include sections from this page file name.
     group_filter:
         If set, only include commands from this group.
+    query:
+        If set, rank candidates before handing them to fzf. Relevance is
+        primary; newer manual page numbers break ties among similarly
+        relevant doc sections.
 
     Results are interleaved so commands appear throughout the list rather
     than always at the bottom.  Within each type, docs sort by page number
@@ -116,7 +121,74 @@ def build_candidates(
         if mode != "doc"
         and (group_filter is None or c.group == group_filter)
     ]
-    return _interleave(docs, cmds)
+    candidates = _interleave(docs, cmds)
+    if query:
+        return rank_candidates(candidates, query)
+    return candidates
+
+
+def rank_candidates(candidates: Sequence[Candidate], query: str) -> list[Candidate]:
+    """Rank candidates for an initial query before interactive fzf filtering.
+
+    The project still relies on fzf for live fuzzy matching, but pre-ranking
+    gives scripted/eval runs a deterministic ordering and makes the first
+    screen favor exact title, heading, and command-path matches. Manual pages
+    with higher page numbers are treated as newer when relevance ties.
+    """
+    terms = _query_terms(query)
+    if not terms:
+        return list(candidates)
+
+    return sorted(
+        candidates,
+        key=lambda cand: _rank_key(cand, " ".join(terms), terms),
+        reverse=True,
+    )
+
+
+def _query_terms(query: str) -> list[str]:
+    """Normalize a query into searchable terms."""
+    return re.findall(r"[a-z0-9]+", query.lower())
+
+
+def _rank_key(cand: Candidate, query: str, terms: Sequence[str]) -> tuple[int, int, int]:
+    """Return (relevance, recency, command boost) for descending sort."""
+    if cand.type == "doc":
+        doc = cast(DocCandidate, cand)
+        title_heading = f"{doc.page_title} {doc.heading}".lower()
+        body = doc.text.lower()
+        relevance = _field_score(query, terms, title_heading, 120)
+        relevance += _field_score(query, terms, body, 35)
+        return relevance, _page_number_from_file(doc.page_file), 0
+
+    cmd = cast(CmdCandidate, cand)
+    path = cmd.path.lower()
+    description = cmd.description.lower()
+    relevance = _field_score(query, terms, path, 140)
+    relevance += _field_score(query, terms, description, 45)
+    return relevance, 0, 1
+
+
+def _field_score(query: str, terms: Sequence[str], text: str, weight: int) -> int:
+    """Score exact phrase and term coverage for one candidate field."""
+    if not text:
+        return 0
+
+    score = 0
+    if query in text:
+        score += weight * 3
+
+    for term in terms:
+        if term in text:
+            score += weight
+
+    return score
+
+
+def _page_number_from_file(page_file: str) -> int:
+    """Extract manual page number from a candidate file name."""
+    match = re.match(r"^(\d+)-", page_file)
+    return int(match.group(1)) if match else 0
 
 
 def _body_excerpt(text: str, max_len: int = BODY_EXCERPT_LENGTH) -> str:
