@@ -267,9 +267,11 @@ def test_render_doc_includes_body_excerpt_field():
     line = render_candidate(cand)
     parts = line.split("\t")
     assert len(parts) == 5
-    assert parts[3].startswith("[doc] Networking")
-    # Body excerpt present and flattened (no newlines)
+    assert parts[3] == "[doc] Networking / Sharing your Wi-Fi"
+    # Body excerpt is concise, plain text, and does not repeat the heading.
     assert "QR Code" in parts[4]
+    assert "Sharing your Wi-Fi" not in parts[4]
+    assert "_" not in parts[4]
     assert "\n" not in parts[4]
 
 
@@ -295,10 +297,40 @@ def test_parse_fzf_line_accepts_legacy_four_field_doc():
 def test_body_excerpt_strips_heading_markers_and_truncates():
     text = "## Heading\n\nThis is a **long** body with   extra spaces and\nnewlines."
     excerpt = _body_excerpt(text, max_len=80)
-    # H2 marker stripped, whitespace collapsed, inline markers preserved
-    assert excerpt.startswith("Heading This is a **long** body")
+    assert excerpt.startswith("This is a long body with extra spaces and newlines.")
+    assert "Heading" not in excerpt
     assert "\n" not in excerpt
     assert len(excerpt) <= 80
+
+
+def test_body_excerpt_removes_markdown_structure_and_keeps_code_content():
+    text = """## Configure
+
+Use [the menu](https://example.com) to configure the setting.
+
+```sh
+omarchy theme set Tokyo
+```
+
+- Restart **Waybar** after changing it.
+"""
+
+    excerpt = _body_excerpt(text)
+
+    assert excerpt == (
+        "Use the menu to configure the setting. omarchy theme set Tokyo "
+        "Restart Waybar after changing it."
+    )
+
+
+def test_body_excerpt_truncates_at_a_word_with_ellipsis():
+    text = "A useful synopsis that continues with enough detail to exceed the compact result limit."
+
+    max_len = 50
+    excerpt = _body_excerpt(text, max_len=max_len)
+
+    assert excerpt == "A useful synopsis that continues with enough..."
+    assert len(excerpt) <= max_len
 
 
 def test_body_excerpt_empty_for_noise():

@@ -13,7 +13,7 @@ from om_search.manual import Section, parse_manual_file
 
 INDEX_VERSION = 1
 INDEX_FILENAME = "index.json"
-BODY_EXCERPT_LENGTH = 150
+BODY_EXCERPT_LENGTH = 120
 
 # The body excerpt is shown dimmed in the picker so the title/heading stays
 # prominent while the excerpt remains fuzzy-matchable (fzf --ansi matches
@@ -24,6 +24,12 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 HAS_REAL_CONTENT_RE = re.compile(r"[a-zA-Z0-9]{3,}")
+_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s+")
+_TABLE_SEPARATOR_RE = re.compile(
+    r"^\s*\|?\s*:?-{3,}:?\s*"
+    r"(?:\|\s*:?-{3,}:?\s*)+\|?\s*$"
+)
 
 
 @dataclass(frozen=True)
@@ -194,17 +200,64 @@ def _page_number_from_file(page_file: str) -> int:
 
 
 def _body_excerpt(text: str, max_len: int = BODY_EXCERPT_LENGTH) -> str:
-    """Flatten first ``max_len`` chars of text for fzf body matching.
+    """Return a short, plain-text synopsis for fzf body matching.
 
-    Strips markdown heading markers, collapses whitespace, and truncates.
-    If the excerpt after flattening is too short to be useful, return empty
-    so fzf does not waste time matching tiny noise.
+    Removes structural Markdown and the section heading, keeps the first
+    useful body content, and truncates at a word or sentence boundary. If the
+    synopsis is too short to be useful, return empty so fzf does not waste
+    time matching tiny noise.
     """
-    cleaned = re.sub(r"^#+\s+", "", text, flags=re.MULTILINE)
-    flat = " ".join(cleaned.split())
+    flat = _plain_markdown(text)
     if not HAS_REAL_CONTENT_RE.search(flat):
         return ""
-    return flat[:max_len]
+    if len(flat) <= max_len:
+        return flat
+
+    sentence_limit = flat[:max_len]
+    sentence_ends = list(re.finditer(r"[.!?](?=\s|$)", sentence_limit))
+    if sentence_ends and sentence_ends[-1].end() >= max_len // 2:
+        return flat[: sentence_ends[-1].end()].rstrip()
+
+    ellipsis = "..."
+    word_limit = max_len - len(ellipsis)
+    cut = flat.rfind(" ", 0, word_limit + 1)
+    if cut <= 0:
+        cut = word_limit
+    return flat[:cut].rstrip(" ,;:-") + ellipsis
+
+
+def _plain_markdown(text: str) -> str:
+    """Flatten Markdown into readable synopsis text without visual noise."""
+    lines: list[str] = []
+    in_fence = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            if line:
+                lines.append(" ".join(line.split()))
+            continue
+        if not line or _HEADING_RE.match(line):
+            continue
+        if _TABLE_SEPARATOR_RE.match(line):
+            continue
+
+        line = re.sub(r"!\[([^]]*)\]\([^)]*\)", r"\1", line)
+        line = re.sub(r"\[([^]]+)\]\([^)]*\)", r"\1", line)
+        line = re.sub(r"<https?://[^>]+>", "", line)
+        line = re.sub(r"`([^`]+)`", r"\1", line)
+        line = re.sub(r"[*_~]", "", line)
+        line = re.sub(r"^[-*+]\s+", "", line)
+        line = re.sub(r"^\d+[.)]\s+", "", line)
+        line = re.sub(r"^>\s?", "", line)
+        line = re.sub(r"\s*\|\s*", " ", line)
+        line = " ".join(line.split())
+        if line:
+            lines.append(line)
+
+    return " ".join(lines)
 
 
 def _section_to_dict(section: Section) -> dict[str, Any]:
@@ -293,7 +346,7 @@ def render_candidate(cand: Candidate) -> str:
     if cand.type == "doc":
         doc = cast(DocCandidate, cand)
         display = (
-            f"[doc] {doc.page_title}  ::  {doc.heading}"
+            f"[doc] {doc.page_title} / {doc.heading}"
             if doc.heading
             else f"[doc] {doc.page_title}"
         )
@@ -323,7 +376,10 @@ def parse_fzf_line(line: str) -> Candidate | None:
             display = display[6:]
         elif display.startswith("[cmd] "):
             display = display[6:]
-        title, sep, heading = display.partition("  ::  ")
+        title, sep, heading = display.partition(" / ")
+        if not sep:
+            # Accept lines rendered by versions before the compact label.
+            title, sep, heading = display.partition("  ::  ")
         excerpt = _ANSI_RE.sub("", fields[4]) if len(fields) >= 5 else ""
         return DocCandidate(
             page_file=fields[1],

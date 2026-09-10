@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Doc viewer now renders markdown to ANSI (`glow` → `mdcat` → `bat`) and opens it in an interactive pager (`less -RFX`), instead of piping raw markdown into a pager. Package now depends on `glow` (rendering) and `less` (paging).
 - Arch packaging now depends on `arch-wiki-lite`; `arch-wiki-docs` is optional for `wiki-search-html` instead of being required.
 - Initial search queries now pre-rank candidates so exact title, heading, and command-path matches appear before weaker body matches, with newer manual pages first when relevance ties.
+- Doc results now use compact page/section labels and cleaned, sentence-aware body synopses without repeated headings or Markdown noise.
 
 ## [0.1.0] - 2026-08-18
 
