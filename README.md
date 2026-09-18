@@ -96,10 +96,12 @@ Default keys (all configurable):
 | `Ctrl-J` / `Ctrl-K` | move down / up |
 | `Ctrl-D` / `Ctrl-U` | half page down / up |
 | `Ctrl-F` / `Ctrl-B` | scroll the preview |
-| `Enter` | open the selection |
+| `Enter` | read a doc in the right pane (reading mode) / run a command |
+| `Ctrl-O` | open the current doc full-screen in the pager |
+| `Ctrl-L` | follow a cross-reference link to another page |
 | `Ctrl-Y` | copy a command to the clipboard |
 | `?` | show the keybindings (in the preview pane) |
-| `Esc` | quit |
+| `Esc` | back one level / quit |
 
 Plain letters still go to the fuzzy query — a fuzzy finder can't use bare
 `j`/`k` for movement, so the vim navigation is on `Ctrl` chords.

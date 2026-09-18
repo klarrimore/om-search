@@ -140,3 +140,36 @@ class TestH3Sections:
         )
         headings = [s.heading for s in parse_manual_file(f) if s.heading]
         assert headings == ["Top", "Nested", "Other"]
+
+
+from om_search.manual import extract_links
+
+
+class TestExtractLinks:
+    def test_extracts_page_links_in_order(self):
+        text = (
+            "See [navigation](04-navigation.md) and "
+            "[the top bar](05-the-top-bar.md).\n"
+        )
+        assert extract_links(text) == [
+            ("navigation", "04-navigation.md", ""),
+            ("the top bar", "05-the-top-bar.md", ""),
+        ]
+
+    def test_captures_anchor_fragment(self):
+        text = "Jump to [grouping](04-navigation.md#grouping-windows)."
+        assert extract_links(text) == [
+            ("grouping", "04-navigation.md", "grouping-windows"),
+        ]
+
+    def test_ignores_external_and_relative_non_manual_links(self):
+        text = (
+            "[site](https://omarchy.org) [img](./pic.png) "
+            "[real](12-screenshots-recording.md)"
+        )
+        assert extract_links(text) == [
+            ("real", "12-screenshots-recording.md", ""),
+        ]
+
+    def test_no_links_returns_empty(self):
+        assert extract_links("# Heading\n\nplain body, no links.\n") == []

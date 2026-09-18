@@ -44,7 +44,8 @@ class TestPickerHeader:
         h = picker_header(mode="all")
         assert "all sources" in h
         assert "Enter: read" in h
-        assert "Ctrl+O: full page" in h
+        assert "Ctrl+O: full" in h
+        assert "Ctrl+L: links" in h
 
     def test_doc_mode(self):
         h = picker_header(mode="doc")
@@ -161,6 +162,11 @@ class TestRunFzf:
         cmd = self._capture(monkeypatch)
         binds = [cmd[i + 1] for i, a in enumerate(cmd) if a == "--bind"]
         assert any(b.startswith("ctrl-o:") and "om-search open" in b for b in binds)
+
+    def test_ctrl_l_follows_links_for_docs(self, monkeypatch):
+        cmd = self._capture(monkeypatch)
+        binds = [cmd[i + 1] for i, a in enumerate(cmd) if a == "--bind"]
+        assert any(b.startswith("ctrl-l:") and "om-search links" in b for b in binds)
 
     def test_movement_is_modal_while_reading(self, monkeypatch):
         cmd = self._capture(monkeypatch)

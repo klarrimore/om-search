@@ -19,7 +19,7 @@ from om_search.index import (
     preview_key,
     render_candidate,
 )
-from om_search.manual import Section, list_pages, parse_manual_file
+from om_search.manual import Section, extract_links, list_pages, parse_manual_file
 from om_search.paths import data_dir, manual_dir, preview_dir, repo_dir
 from om_search.config import write_default_config
 from om_search.picker import (
@@ -125,6 +125,42 @@ def cmd_open(page_file: str, anchor: str = "") -> int:
     )
     view_markdown(page_text(cand), jump_to=heading or None)
     return 0
+
+
+def cmd_links(page_file: str) -> int:
+    """Pick a cross-reference link on ``page_file`` and jump to that page.
+
+    Internal command invoked by the picker's Ctrl-L binding. Lists the page's
+    manual links; selecting one opens that page's scoped doc picker (pre-filtered
+    to the linked section when the link carries an anchor). Backing out of the
+    target returns to the link list.
+    """
+    links = extract_links(page_text(DocCandidate(page_file=page_file)))
+    if not links:
+        print("No links on this page.", file=sys.stderr)
+        return 0
+
+    items: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for label, page, anchor in links:
+        if (page, anchor) in seen:
+            continue
+        seen.add((page, anchor))
+        target = f"{page}#{anchor}" if anchor else page
+        items.append(f"{label}  →  {target}")
+
+    header = "Follow a link  |  Enter: go  |  Esc: back"
+    while True:
+        selected = run_simple_fzf(items, header=header)
+        if selected is None:
+            return 0
+        target = selected.rsplit("→", 1)[-1].strip()
+        page, _, anchor = target.partition("#")
+        query = anchor.replace("-", " ") if anchor else ""
+        result = cmd_picker(mode="doc", page_filter=page, query=query)
+        if result != GO_BACK:
+            return result
+        # else: user backed out of the target page — reshow the link list
 
 
 def cmd_preview(key1: str, key2: str = "") -> int:
@@ -461,6 +497,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_preview(argv[1], argv[2] if len(argv) > 2 else "")
     if argv and argv[0] == "open" and len(argv) >= 2:
         return cmd_open(argv[1], argv[2] if len(argv) > 2 else "")
+    if argv and argv[0] == "links" and len(argv) >= 2:
+        return cmd_links(argv[1])
 
     parser = build_parser()
     # argcomplete only acts during shell completion (when the shell sets

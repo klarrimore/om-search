@@ -582,6 +582,62 @@ class TestCmdOpen:
         assert seen == {"t": "FULLPAGE", "jump": None}
 
 
+class TestCmdLinks:
+    def test_no_links_returns_0(self, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "page_text", lambda cand: "no links here")
+        assert cli.cmd_links("04.md") == 0
+        assert "No links" in capsys.readouterr().err
+
+    def test_selection_navigates_to_target_page(self, monkeypatch):
+        monkeypatch.setattr(
+            cli, "page_text",
+            lambda cand: "see [nav](04-navigation.md) and [top](05-the-top-bar.md)",
+        )
+        monkeypatch.setattr(
+            cli, "run_simple_fzf",
+            lambda items, **k: next(i for i in items if "05-the-top-bar" in i),
+        )
+        got = {}
+        monkeypatch.setattr(cli, "cmd_picker", lambda **kw: got.update(kw) or 0)
+        assert cli.cmd_links("03.md") == 0
+        assert got["mode"] == "doc"
+        assert got["page_filter"] == "05-the-top-bar.md"
+
+    def test_anchor_prefilters_query(self, monkeypatch):
+        monkeypatch.setattr(
+            cli, "page_text",
+            lambda cand: "jump [g](04-navigation.md#grouping-windows)",
+        )
+        monkeypatch.setattr(cli, "run_simple_fzf", lambda items, **k: items[0])
+        got = {}
+        monkeypatch.setattr(cli, "cmd_picker", lambda **kw: got.update(kw) or 0)
+        cli.cmd_links("03.md")
+        assert got["page_filter"] == "04-navigation.md"
+        assert got["query"] == "grouping windows"
+
+    def test_back_from_target_reshows_link_list(self, monkeypatch):
+        monkeypatch.setattr(
+            cli, "page_text", lambda cand: "[nav](04-navigation.md)"
+        )
+        seq = iter([lambda items: items[0], lambda items: None])
+        monkeypatch.setattr(
+            cli, "run_simple_fzf", lambda items, **k: next(seq)(items)
+        )
+        calls = {"picker": 0}
+        def fake_picker(**kw):
+            calls["picker"] += 1
+            return cli.GO_BACK
+        monkeypatch.setattr(cli, "cmd_picker", fake_picker)
+        assert cli.cmd_links("03.md") == 0
+        assert calls["picker"] == 1  # entered target once, backed out, list reshown
+
+    def test_links_intercepted_in_main(self, monkeypatch):
+        seen = {}
+        monkeypatch.setattr(cli, "cmd_links", lambda p: seen.update(p=p) or 0)
+        assert cli.main(["links", "03-coming-from-mac-or-windows.md"]) == 0
+        assert seen == {"p": "03-coming-from-mac-or-windows.md"}
+
+
 class TestLoadSectionsAndListPages:
     def test_load_sections_uses_index_when_present(self, monkeypatch, tmp_path):
         monkeypatch.setattr(cli, "load_index", lambda p: (["S"], {}))

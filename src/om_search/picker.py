@@ -235,7 +235,7 @@ def picker_header(
         parts.append(f"group: {group_filter}")
 
     scope = ", ".join(parts)
-    return f"Mode: {scope}  |  Enter: read  ·  Ctrl+O: full page  ·  Ctrl+Y: copy"
+    return f"Mode: {scope}  |  Enter: read · Ctrl+O: full · Ctrl+L: links · Ctrl+Y: copy"
 
 
 # Friendly labels for the help cheatsheet, in display order.
@@ -316,7 +316,7 @@ BACK = "\x00BACK\x00"  # sentinel: user asked to pop back to the parent list
 # action). The mode flag is carried in the prompt so `transform` binds can test
 # it; Esc leaves reading mode and Ctrl-O opens the full page in the pager.
 _READING_MARK = "reading"
-_READING_PROMPT = "  reading — Esc: back · Ctrl+O: full page  "
+_READING_PROMPT = "  reading — Esc: back · Ctrl+O: full · Ctrl+L: links  "
 _NORMAL_PROMPT = "  "
 _READ_WIN = "right,90%,wrap,border-rounded"
 _NORMAL_WIN = "right,60%,wrap,border-rounded"
@@ -349,6 +349,9 @@ def _reading_binds(cfg: Config) -> list[str]:
         # Ctrl-O: open the full page in the scrollable pager (docs only).
         "--bind",
         'ctrl-o:transform:[[ {1} == doc ]] && echo "execute(om-search open {2} {3})"',
+        # Ctrl-L: follow a cross-reference link on this page (docs only).
+        "--bind",
+        'ctrl-l:transform:[[ {1} == doc ]] && echo "execute(om-search links {2})"',
     ]
     # While reading, movement keys scroll the preview instead of the list.
     binds += modal(k.get("down", "ctrl-j"), "preview-down", "down")

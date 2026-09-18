@@ -7,6 +7,10 @@ from pathlib import Path
 H1_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 HEADING_RE = re.compile(r"^(#{2,3})\s+(.+?)\s*\[?#?\]?\s*$", re.MULTILINE)
 ANCHOR_CHARS_RE = re.compile(r"[^a-z0-9\s-]")
+# Markdown links to another manual page: [label](NN-slug.md[#anchor]).
+LINK_RE = re.compile(
+    r"\[([^\]]+)\]\((\d{2}-[a-z0-9-]+\.md)(?:#([a-z0-9-]+))?\)"
+)
 
 
 @dataclass(frozen=True)
@@ -114,3 +118,12 @@ def _number_from_filename(name: str) -> int:
     """
     match = re.match(r"^(\d+)-", name)
     return int(match.group(1)) if match else 0
+
+
+def extract_links(text: str) -> list[tuple[str, str, str]]:
+    """Return ``(label, page_file, anchor)`` for each manual cross-link.
+
+    Only links to other manual pages (``NN-slug.md``) are returned, in the
+    order they appear; external URLs and non-manual relative links are ignored.
+    """
+    return [(m.group(1), m.group(2), m.group(3) or "") for m in LINK_RE.finditer(text)]
