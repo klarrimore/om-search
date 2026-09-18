@@ -82,6 +82,29 @@ class TestParseCommandsJson:
                     description="List themes"),
         ]
 
+    def test_envelope_shape(self):
+        # The current `omarchy commands --json` output: an {ok, commands:[...]}
+        # envelope whose items carry `route`/`group`/`name`/`summary`.
+        # Regression: this previously parsed to zero commands.
+        raw = """
+        {
+          "ok": true,
+          "commands": [
+            {"route": "omarchy theme set", "group": "theme", "name": "set",
+             "summary": "Apply an Omarchy theme"},
+            {"route": "omarchy pkg aur add", "group": "pkg", "name": "aur add",
+             "summary": "Install AUR packages"}
+          ]
+        }
+        """
+        commands = parse_commands_json(raw)
+        assert commands == [
+            Command(group="pkg", name="aur add", path="omarchy pkg aur add",
+                    description="Install AUR packages"),
+            Command(group="theme", name="set", path="omarchy theme set",
+                    description="Apply an Omarchy theme"),
+        ]
+
     def test_plain_dict_group_to_description(self):
         raw = '{"capture": "Screenshots and screen recording", "audio": "Audio controls"}'
         commands = parse_commands_json(raw)
@@ -108,11 +131,11 @@ class TestParseFullFixture:
         assert "restart" in categories
         assert "toggle" in categories
         assert "theme" in categories
-        assert "install" in categories
-        assert "launch" in categories
-        assert "cmd" in categories
+        assert "plugin" in categories
+        assert "menu" in categories
+        assert "capture" in categories
         assert "pkg" in categories
-        assert "setup" in categories
+        assert "system" in categories
         assert "font" in categories
 
     def test_known_commands_present(self):
@@ -122,7 +145,9 @@ class TestParseFullFixture:
         assert "omarchy theme set" in paths
         assert "omarchy pkg add" in paths
         assert "omarchy pkg drop" in paths
-        assert "omarchy restart waybar" in paths
+        assert "omarchy restart shell" in paths
+        assert "omarchy plugin clone" in paths
+        assert "omarchy toggle nightlight" in paths
         assert "omarchy system shutdown" in paths
         assert "omarchy menu keybindings" in paths
 

@@ -1,100 +1,343 @@
 {
-  "refresh": {
-    "description": "Reset configs to defaults (backed up first)",
-    "commands": {
-      "waybar": {"description": "Reset Waybar to default config"},
-      "hyprland": {"description": "Reset Hyprland to default config"}
+  "ok": true,
+  "commands": [
+    {
+      "route": "omarchy bar",
+      "binary": "omarchy-bar",
+      "group": "bar",
+      "name": "",
+      "summary": "Configure the bar and its widget layout",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "use <id> | reset | defaults | position <top|bottom|left|right> | transparent <true|false|toggle> | put <id> [placement] | move <id> [placement] | set <id> <key> <value> [--json] [placement]",
+      "aliases": []
+    },
+    {
+      "route": "omarchy capture screenrecording",
+      "binary": "omarchy-capture-screenrecording",
+      "group": "capture",
+      "name": "screenrecording",
+      "summary": "Start or stop screen recording",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "[--fullscreen] [--with-desktop-audio] [--with-microphone-audio] [--with-webcam] [--webcam-device=<device>] [--webcam-size=<small|medium|large>] [--resolution=<size>] [--stop-recording]",
+      "aliases": [
+        "omarchy screenrecord"
+      ]
+    },
+    {
+      "route": "omarchy capture screenshot",
+      "binary": "omarchy-capture-screenshot",
+      "group": "capture",
+      "name": "screenshot",
+      "summary": "Take a screenshot",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "[smart|region|windows|fullscreen] [slurp|copy|save] [--editor=<name>]",
+      "aliases": [
+        "omarchy screenshot"
+      ]
+    },
+    {
+      "route": "omarchy capture text",
+      "binary": "omarchy-capture-text",
+      "group": "capture",
+      "name": "text",
+      "summary": "Extract text from a screenshot region with OCR",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy default terminal",
+      "binary": "omarchy-default-terminal",
+      "group": "default",
+      "name": "terminal",
+      "summary": "Set the default terminal used by xdg-terminal-exec",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "[alacritty|foot|ghostty|kitty]",
+      "aliases": []
+    },
+    {
+      "route": "omarchy font list",
+      "binary": "omarchy-font-list",
+      "group": "font",
+      "name": "list",
+      "summary": "List available monospace fonts",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy font set",
+      "binary": "omarchy-font-set",
+      "group": "font",
+      "name": "set",
+      "summary": "Set the system monospace font",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "<font-name>",
+      "aliases": []
+    },
+    {
+      "route": "omarchy hook install",
+      "binary": "omarchy-hook-install",
+      "group": "hook",
+      "name": "install",
+      "summary": "Install a hook into ~/.config/omarchy/hooks/<type>.d/",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "<type> <file>",
+      "aliases": []
+    },
+    {
+      "route": "omarchy menu keybindings",
+      "binary": "omarchy-menu-keybindings",
+      "group": "menu",
+      "name": "keybindings",
+      "summary": "Display Hyprland keybindings defined in your configuration using an interactive search menu.",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy menu",
+      "binary": "omarchy-menu",
+      "group": "menu",
+      "name": "",
+      "summary": "Control the Omarchy menu (toggle / summon / close / refresh)",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "[toggle|summon|close|refresh|ping] [route]",
+      "aliases": []
+    },
+    {
+      "route": "omarchy pkg add",
+      "binary": "omarchy-pkg-add",
+      "group": "pkg",
+      "name": "add",
+      "summary": "Install Arch packages if they are missing",
+      "requires_sudo": true,
+      "hidden": false,
+      "args": "<packages...>",
+      "aliases": []
+    },
+    {
+      "route": "omarchy pkg aur add",
+      "binary": "omarchy-pkg-aur-add",
+      "group": "pkg",
+      "name": "aur add",
+      "summary": "Add the named packages to the system from the AUR if they're missing. Returns false if it couldn't be done.",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "<packages...>",
+      "aliases": []
+    },
+    {
+      "route": "omarchy pkg drop",
+      "binary": "omarchy-pkg-drop",
+      "group": "pkg",
+      "name": "drop",
+      "summary": "Remove all the named packages from the system if they're installed (otherwise ignore).",
+      "requires_sudo": true,
+      "hidden": false,
+      "args": "<packages...>",
+      "aliases": []
+    },
+    {
+      "route": "omarchy plugin clone",
+      "binary": "omarchy-plugin-clone",
+      "group": "plugin",
+      "name": "clone",
+      "summary": "Clone a built-in Omarchy shell plugin into your own config",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "<source-id> [--edit]",
+      "aliases": []
+    },
+    {
+      "route": "omarchy plugin list",
+      "binary": "omarchy-plugin-list",
+      "group": "plugin",
+      "name": "list",
+      "summary": "List discovered shell plugins",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "[--json]",
+      "aliases": []
+    },
+    {
+      "route": "omarchy refresh hyprland",
+      "binary": "omarchy-refresh-hyprland",
+      "group": "refresh",
+      "name": "hyprland",
+      "summary": "Overwrite all the user Hyprland Lua configs in ~/.config/hypr with the Omarchy defaults.",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy refresh shell",
+      "binary": "omarchy-refresh-shell",
+      "group": "refresh",
+      "name": "shell",
+      "summary": "Reset shell.json to Omarchy defaults",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy reminder",
+      "binary": "omarchy-reminder",
+      "group": "reminder",
+      "name": "",
+      "summary": "Set and show lightweight desktop notification reminders",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "[-i|--interactive] | <minutes> [message] | show [-j|--json] | clear",
+      "aliases": []
+    },
+    {
+      "route": "omarchy restart shell",
+      "binary": "omarchy-restart-shell",
+      "group": "restart",
+      "name": "shell",
+      "summary": "Restart the Omarchy shell",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy restart terminal",
+      "binary": "omarchy-restart-terminal",
+      "group": "restart",
+      "name": "terminal",
+      "summary": "Reload supported terminal emulators after config changes",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy system lock",
+      "binary": "omarchy-system-lock",
+      "group": "system",
+      "name": "lock",
+      "summary": "Lock the computer and turn off the display",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy system reboot",
+      "binary": "omarchy-system-reboot",
+      "group": "system",
+      "name": "reboot",
+      "summary": "Reboot after closing application windows",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": [
+        "omarchy reboot"
+      ]
+    },
+    {
+      "route": "omarchy system shutdown",
+      "binary": "omarchy-system-shutdown",
+      "group": "system",
+      "name": "shutdown",
+      "summary": "Shut down after closing application windows",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": [
+        "omarchy shutdown"
+      ]
+    },
+    {
+      "route": "omarchy theme bg next",
+      "binary": "omarchy-theme-bg-next",
+      "group": "theme",
+      "name": "bg next",
+      "summary": "Cycle to the next background for the current theme",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy theme list",
+      "binary": "omarchy-theme-list",
+      "group": "theme",
+      "name": "list",
+      "summary": "List available themes",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
+    },
+    {
+      "route": "omarchy theme set",
+      "binary": "omarchy-theme-set",
+      "group": "theme",
+      "name": "set",
+      "summary": "Apply an Omarchy theme",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "<theme-name>",
+      "aliases": []
+    },
+    {
+      "route": "omarchy toggle bar",
+      "binary": "omarchy-toggle-bar",
+      "group": "toggle",
+      "name": "bar",
+      "summary": "Toggle bar visibility without killing the Omarchy shell",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "[toggle|on|off]",
+      "aliases": []
+    },
+    {
+      "route": "omarchy toggle nightlight",
+      "binary": "omarchy-toggle-nightlight",
+      "group": "toggle",
+      "name": "nightlight",
+      "summary": "Toggle nightlight screen temperature",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "[--status]",
+      "aliases": []
+    },
+    {
+      "route": "omarchy update",
+      "binary": "omarchy-update",
+      "group": "update",
+      "name": "",
+      "summary": "Update Omarchy and system packages",
+      "requires_sudo": true,
+      "hidden": false,
+      "args": "[-y]",
+      "aliases": []
+    },
+    {
+      "route": "omarchy version",
+      "binary": "omarchy-version",
+      "group": "version",
+      "name": "",
+      "summary": "Print the installed Omarchy version",
+      "requires_sudo": false,
+      "hidden": false,
+      "args": "",
+      "aliases": []
     }
-  },
-  "restart": {
-    "description": "Restart services and apps",
-    "commands": {
-      "waybar": {"description": "Restart Waybar"},
-      "walker": {"description": "Restart Walker"},
-      "terminal": {"description": "Restart the terminal emulator"}
-    }
-  },
-  "toggle": {
-    "description": "Toggle features on and off",
-    "commands": {
-      "nightlight": {"description": "Toggle night light"},
-      "waybar": {"description": "Toggle Waybar visibility"}
-    }
-  },
-  "theme": {
-    "description": "Theme management",
-    "commands": {
-      "list": {"description": "List available themes"},
-      "current": {"description": "Show current theme"},
-      "set": {"description": "Apply a theme, e.g. omarchy-theme-set \"Tokyo Night\""},
-      "next": {"description": "Cycle to next theme"},
-      "bg-next": {"description": "Cycle wallpaper"},
-      "install": {"description": "Install a theme from a git URL"}
-    }
-  },
-  "install": {
-    "description": "Install optional software",
-    "commands": {
-      "docker-dbs": {"description": "Install Docker databases (PostgreSQL, MySQL, Redis)"}
-    }
-  },
-  "launch": {
-    "description": "Launch applications",
-    "commands": {
-      "browser": {"description": "Open the default browser"}
-    }
-  },
-  "cmd": {
-    "description": "System commands",
-    "commands": {
-      "screenshot": {"description": "Take a screenshot"}
-    }
-  },
-  "pkg": {
-    "description": "Package management",
-    "commands": {
-      "add": {"description": "Install a package (preferred)"},
-      "aur-add": {"description": "Install an AUR-only package"},
-      "drop": {"description": "Remove a package"}
-    }
-  },
-  "setup": {
-    "description": "Initial setup tasks",
-    "commands": {
-      "fingerprint": {"description": "Set up fingerprint authentication"}
-    }
-  },
-  "font": {
-    "description": "Font management",
-    "commands": {
-      "list": {"description": "List available fonts"},
-      "current": {"description": "Show current font"},
-      "set": {"description": "Change the system font"}
-    }
-  },
-  "menu": {
-    "description": "Omarchy menu utilities",
-    "commands": {
-      "keybindings": {"description": "Show current keybindings"}
-    }
-  },
-  "system": {
-    "description": "Power and system control",
-    "commands": {
-      "shutdown": {"description": "Shutdown the computer"},
-      "reboot": {"description": "Reboot the computer"}
-    }
-  },
-  "debug": {
-    "description": "Debug and diagnostics",
-    "commands": {
-      "debug": {"description": "Print system debug info (use --no-sudo --print to avoid interactive prompts)"}
-    }
-  },
-  "upload": {
-    "description": "Log upload for support",
-    "commands": {
-      "log": {"description": "Upload logs for support"}
-    }
-  }
+  ]
 }

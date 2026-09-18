@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-18
+
 ### Added
 - Source filtering: `--docs` and `--cmds` flags to search only documentation or only CLI commands. (#5)
 - Page and group browsing: `--pages` and `--groups` flags for drill-down navigation. (#5)
@@ -27,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive search query (`om-search <term>`) now filters the picker correctly instead of displaying all results — fzf `--nth 4,5` operated on the transformed (single-field) line, making the fields unreachable. (#8)
 - Body-text matching now actually works: the picker presents and searches both the display field and the body excerpt via fzf `--with-nth 4,5`. Previously `--with-nth 4` limited both display and search to the title/heading, so words appearing only in a section body were unfindable. The excerpt is shown dimmed (ANSI) and stripped back off on selection.
 - Initial search queries now filter out unrelated zero-score candidates when direct matches exist, preventing broad fuzzy matches like `herdr` from flooding the picker.
+- Command surface restored on current Omarchy: `omarchy commands --json` now emits an `{ok, commands: [...]}` envelope whose items carry `route`/`group`/`name`/`summary`. The parser ignored this shape and returned zero commands, silently dropping every machine into docs-only degraded mode. The full-tree test fixture was regenerated in the real envelope shape (quattro/Quickshell command tree) and the fixture tests updated accordingly.
 
 ### Changed
 - CLI argument parsing… switched to flags (``--docs``, ``--pages``, etc.) instead of subparsers, following the Omarchy CLI convention.  The ``preview`` subcommand remains for fzf integration. (#5)
@@ -36,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Arch packaging now depends on `arch-wiki-lite`; `arch-wiki-docs` is optional for `wiki-search-html` instead of being required.
 - Initial search queries now pre-rank candidates so exact title, heading, and command-path matches appear before weaker body matches, with newer manual pages first when relevance ties.
 - Doc results now use compact page/section labels and cleaned, sentence-aware body synopses without repeated headings or Markdown noise.
+- Reconciled the domain docs (`CONTEXT.md`, `docs/search-topics.md`) to the current Omarchy release (quattro/Quickshell): documented the Omarchy shell (`shell.json`, `omarchy bar`, `omarchy plugin`), the Quickshell menu, shell-based notifications/OSD, and the Foot terminal in place of the removed Waybar/Walker/Mako/SwayOSD stack; migrated command references to the `omarchy <group> <action>` model and corrected source paths to `/usr/share/omarchy`.
 
 ## [0.1.0] - 2026-08-18
 
@@ -60,5 +64,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PyPI package metadata, MIT license, classifiers, and project URLs. (#4)
 - Development toolchain: pytest, mypy, uv build. (#1)
 
-[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/klarrimore/om-search/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/klarrimore/om-search/releases/tag/v0.1.0

@@ -44,28 +44,32 @@ _Avoid_: execute directly, shell out
 The Wayland compositor and window manager on Omarchy. Config files at `~/.config/hypr/*.lua` (Lua-based in the quattro branch; any `*.conf` in that directory is an orphaned pre-quattro leftover). Auto-reloads on file save. Users search for keybindings, window rules, monitors, animations, lock screen, night light.
 _Avoid_: i3, sway
 
-**Waybar**:
-The status bar. Config at `~/.config/waybar/config.jsonc` (layout and modules) and `~/.config/waybar/style.css` (styling). Does NOT auto-reload -- must run `omarchy-restart-waybar` after changes.
-_Avoid_: polybar, eww
-
-**Walker**:
-The app launcher. Config at `~/.config/walker/config.toml`.
-_Avoid_: rofi, dmenu
-
-**Mako**:
-The notification daemon. Config under `~/.config/mako/`.
-_Avoid_: dunst, notify-send
-
-**SwayOSD**:
-The on-screen display for volume, brightness, caps lock. Config at `~/.config/swayosd/`.
-_Avoid_: volume popup, osd window
-
-**Quickshell**:
-The desktop shell providing panels and widgets on Omarchy. Not directly user-configured.
+**Omarchy shell**:
+The Quickshell-based desktop shell providing the status bar, notifications, and on-screen display. Replaced the old Waybar/Mako/SwayOSD stack in the quattro (Quickshell) era. Configured via `~/.config/omarchy/shell.json` (top-level keys: `bar`, `idle`, `plugins`, `version`). `shell.json` and user plugin code hot-reload on save; apply harder changes with `omarchy restart shell`, reset with `omarchy refresh shell`.
 _Avoid_: panel, taskbar
 
+**Bar**:
+The status bar within the Omarchy shell. Layout and widgets are managed with `omarchy bar` (`use`, `position`, `transparent`, `put`, `move`, `set`) and the `bar` block of `shell.json`. Widgets are shell plugins identified like `omarchy.clock` or `omarchy.keyboard-layout`. Clone a built-in widget to customize it: `omarchy plugin clone <id>`.
+_Avoid_: Waybar, polybar, eww
+
+**Omarchy menu**:
+The Quickshell launcher/menu. Config at `~/.config/omarchy/extensions/omarchy-menu.jsonc`, which hot-reloads on save. Replaced Walker.
+_Avoid_: Walker, rofi, dmenu
+
+**Notifications**:
+Provided by the Omarchy shell (Quickshell), not a standalone daemon. Replaced Mako.
+_Avoid_: Mako, dunst, notify-send
+
+**Omarchy OSD**:
+The on-screen display for volume, brightness, caps lock, and similar, rendered by the Omarchy shell (Quickshell). Replaced SwayOSD.
+_Avoid_: SwayOSD, volume popup, osd window
+
+**Shell plugins**:
+The unit of Omarchy shell customization: bar widgets and other shell components. Manage with `omarchy plugin` (`add`, `clone`, `enable`, `disable`, `list`). Built-in plugins ship in the packaged shell and must be cloned (`omarchy plugin clone <id>`) before editing; user copies live under `~/.config/omarchy/plugins/`.
+_Avoid_: widgets, modules
+
 **Terminals**:
-Supported terminals: Alacritty (`~/.config/alacritty/alacritty.toml`), Kitty (`~/.config/kitty/kitty.conf`), Ghostty (`~/.config/ghostty/config`). Users search for font configuration, transparency, color scheme.
+Supported terminals: Alacritty (`~/.config/alacritty/alacritty.toml`), Foot (`~/.config/foot/foot.ini`), Kitty (`~/.config/kitty/kitty.conf`), Ghostty (`~/.config/ghostty/config`). Apply changes with `omarchy restart terminal`. Users search for font configuration, transparency, color scheme.
 _Avoid_: gnome-terminal, konsole
 
 **Keybindings**:

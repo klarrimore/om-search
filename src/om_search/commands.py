@@ -31,6 +31,8 @@ def parse_commands_json(raw: str) -> list[Command]:
     """Parse the output of `omarchy commands --json` into a flat command list.
 
     Accepts several plausible JSON shapes:
+    - Envelope: {"ok": true, "commands": [{"route": "omarchy group name",
+      "group": "...", "name": "...", "summary": "..."}]} (the current CLI)
     - Grouped dict: {"group": {"description": "...", "commands": {"name": {...}}}}
     - Flat list: [{"group": "...", "command": "...", "description": "..."}]
     - Full-path list: [{"command": "omarchy group name", "description": "..."}]
@@ -44,6 +46,9 @@ def parse_commands_json(raw: str) -> list[Command]:
         return []
 
     if isinstance(data, dict):
+        inner = data.get("commands")
+        if isinstance(inner, list):
+            return _parse_flat_list(inner)
         return _parse_grouped_dict(data)
     elif isinstance(data, list):
         return _parse_flat_list(data)
@@ -80,6 +85,23 @@ def _parse_flat_list(data: list[Any]) -> list[Command]:
         if not isinstance(item, dict):
             continue
         desc = (item.get("description") or item.get("desc") or item.get("summary") or "")
+        # Envelope shape: {"route": "omarchy group name", "group", "name", "summary"}
+        route = item.get("route")
+        if isinstance(route, str) and route.startswith("omarchy "):
+            group = item.get("group") or ""
+            name = item.get("name") or ""
+            if group and name:
+                results.append(
+                    Command(
+                        group=str(group),
+                        name=str(name),
+                        path=route,
+                        description=str(desc),
+                    )
+                )
+            else:
+                _parse_with_path(route, str(desc), results)
+            continue
         # Full-path shape: {"command": "omarchy group name"}
         cmd = item.get("command") or item.get("name") or ""
         if not isinstance(cmd, str) or not cmd:

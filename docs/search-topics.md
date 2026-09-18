@@ -10,123 +10,137 @@ Users searching for themes, wallpapers, or visual customization.
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| theme | `04-navigation` (Themes section) | `omarchy-theme-list`, `omarchy-theme-current`, `omarchy-theme-set`, `omarchy-theme-next`, `omarchy-theme-bg-next`, `omarchy-theme-install` | Theme names use display format: `"Tokyo Night"` not `tokyo-night` |
-| wallpaper | `omarchy-theme-bg-next` | | |
-| font | | `omarchy-font-list`, `omarchy-font-current`, `omarchy-font-set` | |
+| theme | `04-navigation` (Themes section) | `omarchy theme list`, `omarchy theme current`, `omarchy theme set <name>`, `omarchy theme switcher`, `omarchy theme install <url>`, `omarchy theme update` | Theme names use display format: `"Tokyo Night"` not `tokyo-night` |
+| wallpaper | | `omarchy theme bg next`, `omarchy theme bg set <path>`, `omarchy theme bg-switcher` | |
+| font | | `omarchy font list`, `omarchy font current`, `omarchy font set` | |
 
-## Screenshots & screen recording
+## Screenshots, recording & capture
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| screenshot | `12-screenshots-recording` | `omarchy-cmd-screenshot` | Print Screen key freezes screen |
-| screen recording | `12-screenshots-recording` | | Alt+Print Screen opens picker |
-| recording | `12-screenshots-recording` | | |
+| screenshot | `12-screenshots-recording` | `omarchy capture screenshot [smart\|region\|windows\|fullscreen]` | Print Screen key freezes screen |
+| screen recording | `12-screenshots-recording` | `omarchy capture screenrecording [--fullscreen] [--stop-recording]` | Alt+Print Screen opens picker |
+| ocr / extract text | | `omarchy capture text` | OCR from a screenshot region |
+| qr code | | `omarchy capture qr` | Decodes a QR from a screenshot region |
 
 ## Keybindings & navigation
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| keybindings | | `omarchy-menu-keybindings --print` | Re-binding needs `unbind` before `bind` in `~/.config/hypr/bindings.lua` |
+| keybindings | | `omarchy menu keybindings` | Re-binding needs `unbind` before `bind` in `~/.config/hypr/bindings.lua` |
 | shortcuts | | | |
-| navigation | `04-navigation` | | Super+Space opens menu |
+| navigation | `04-navigation` | `omarchy menu` | Super+Space opens the menu |
 | hotkeys | | | |
 
 ## Window manager (Hyprland)
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| hyprland | | | Config is Lua in quattro (not conf); auto-reloads on save |
+| hyprland | | `omarchy restart hyprctl` | Config is Lua in quattro (not conf); auto-reloads on save |
 | window rules | | `hyprctl reload` | Syntax changes between Hyprland versions; check wiki |
 | animations | | | In `~/.config/hypr/looknfeel.lua` |
-| gaps | | | In `~/.config/hypr/looknfeel.lua` |
+| gaps | | `omarchy hyprland window gaps toggle` | In `~/.config/hypr/looknfeel.lua` |
 | borders | | | In `~/.config/hypr/looknfeel.lua` |
+| transparency | | `omarchy hyprland window transparency toggle` | |
 | monitors | | `hyprctl monitors` | Edit `~/.config/hypr/monitors.lua` |
 | display | | | |
 
-## Status bar (Waybar)
+## Status bar (Omarchy shell)
+
+Quickshell-based; replaced Waybar in the quattro era.
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| waybar | | `omarchy-restart-waybar`, `omarchy-refresh-waybar`, `omarchy-toggle-waybar` | Does NOT auto-reload -- must run `omarchy-restart-waybar` |
-| status bar | | | Config: `~/.config/waybar/config.jsonc`, styling: `style.css` |
-| bar modules | | | |
+| status bar | | `omarchy bar use\|position\|put\|move\|set`, `omarchy toggle bar`, `omarchy restart shell`, `omarchy refresh shell` | Config: `~/.config/omarchy/shell.json` (`bar` block); hot-reloads on save |
+| waybar | | | Removed in quattro; now the Omarchy shell / `omarchy bar` |
+| bar widgets / modules | | `omarchy plugin list`, `omarchy plugin clone <id>`, `omarchy plugin enable\|disable <id>` | Widgets are shell plugins, e.g. `omarchy.clock`, `omarchy.keyboard-layout`; clone before editing |
 
 ## Lock screen & idle
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| lock screen | | `omarchy-lock-screen` | Config at `~/.config/hypr/hyprlock.lua` |
-| idle | | | Config at `~/.config/hypr/hypridle.lua` |
-| suspend | | | |
+| lock screen | | `omarchy system lock` | Idle-to-lock timeout in `shell.json` -> `idle.lock` (seconds) |
+| idle | | `omarchy toggle idle` | `shell.json` `idle` block (`screensaver`, `lock`); no more `hypridle.lua` |
+| screensaver | | `omarchy toggle screensaver` | `idle.screensaver` in `shell.json` |
+| suspend | | `omarchy toggle suspend` | |
 | screen off | | | |
 
 ## Night light
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| night light | | `omarchy-toggle-nightlight` | Config at `~/.config/hypr/hyprsunset.lua` |
+| night light | | `omarchy toggle nightlight`, `omarchy restart hyprsunset`, `omarchy refresh hyprsunset` | Config at `~/.config/hypr/hyprsunset.conf` (schedules/profiles) |
 | blue light | | | |
 
-## App launcher (Walker)
+## App launcher / menu
+
+Quickshell menu; replaced Walker in the quattro era.
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| walker | | `omarchy-restart-walker` | Config: `~/.config/walker/config.toml` |
-| app launcher | | | |
+| menu / launcher | | `omarchy menu`, `omarchy menu clipboard\|emoji\|file\|input\|timezone` | Config: `~/.config/omarchy/extensions/omarchy-menu.jsonc` (hot-reloads) |
+| app launcher | | `omarchy menu` | |
+| walker | | | Removed in quattro; now `omarchy menu` |
 
-## Notifications (Mako)
+## Notifications & OSD
+
+Both provided by the Omarchy shell (Quickshell); Mako and SwayOSD are gone.
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| mako | | | Config under `~/.config/mako/` |
-| notifications | | | |
-| osd | | | SwayOSD at `~/.config/swayosd/` |
+| notifications | | `omarchy toggle notification silencing` | Rendered by the Omarchy shell; no standalone daemon |
+| mako | | | Removed in quattro |
+| osd | | | Omarchy OSD, part of the shell; no SwayOSD |
 
 ## Package management
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| install package | | `omarchy-pkg-add`, `omarchy-pkg-aur-add` | `omarchy-pkg-add` is canonical; `omarchy-pkg-install` also exists |
-| remove package | | `omarchy-pkg-drop` | |
-| aur | | `omarchy-pkg-aur-add` | |
+| install package | | `omarchy pkg add`, `omarchy pkg aur add` | `omarchy pkg add` is canonical; `omarchy pkg install` also exists |
+| remove package | | `omarchy pkg drop`, `omarchy pkg remove` | |
+| aur | | `omarchy pkg aur add` | |
 
 ## System operations
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| update | | `omarchy-update` | Full system update |
-| version | | `omarchy-version` | |
-| shutdown | | `omarchy-system-shutdown` | |
-| reboot | | `omarchy-system-reboot` | |
-| debug | | `omarchy-debug --no-sudo --print` | Without flags it launches an interactive sudo prompt that hangs |
-| upload logs | | `omarchy-upload-log` | |
-| fingerprint | | `omarchy-setup-fingerprint` | |
-| reinstall | | `omarchy-reinstall` | Destructive; ask before running |
+| update | | `omarchy update` | Subcommands: `omarchy update available\|firmware\|keyring\|system pkgs\|aur pkgs` |
+| version | | `omarchy version`, `omarchy version channel`, `omarchy version pkgs` | |
+| shutdown | | `omarchy system shutdown` | |
+| reboot | | `omarchy system reboot` | |
+| logout | | `omarchy system logout` | |
+| stats | | `omarchy system stats` | |
+| debug | | `omarchy debug --no-sudo --print` | Ungrouped legacy binary (not in `omarchy commands`); without flags it hangs on a sudo prompt |
+| reminder | | `omarchy reminder <minutes> [message]`, `omarchy reminder show`, `omarchy reminder clear` | Desktop-notification reminders |
+| fingerprint | | `omarchy setup security fingerprint` | |
+| reinstall | | `omarchy reinstall` | Destructive; ask before running |
 
 ## Config reset & refresh
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| reset config | | `omarchy-refresh-waybar`, `omarchy-refresh-hyprland`, `omarchy-refresh-config` | Creates timestamped backup; seek confirmation before running |
-| refresh | | `omarchy-refresh-<app>` | |
-| restore defaults | | | |
+| reset config | | `omarchy refresh shell`, `omarchy refresh hyprland`, `omarchy refresh config <path>` | Creates timestamped backup; seek confirmation before running |
+| refresh | | `omarchy refresh <target>` | Targets include: shell, hyprland, hyprsunset, herdr, tmux, config, pacman, limine, plymouth, sddm |
+| restore defaults | | | No `refresh waybar` any more; use `refresh shell` |
 
 ## Terminal configuration
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| alacritty | | | Config: `~/.config/alacritty/alacritty.toml` |
-| kitty | | `omarchy-restart-terminal` | Config: `~/.config/kitty/kitty.conf` |
-| ghostty | | | Config: `~/.config/ghostty/config` |
+| alacritty | | `omarchy restart terminal` | Config: `~/.config/alacritty/alacritty.toml` |
+| foot | | `omarchy restart terminal` | Config: `~/.config/foot/foot.ini` |
+| kitty | | `omarchy restart terminal` | Config: `~/.config/kitty/kitty.conf` |
+| ghostty | | `omarchy restart terminal` | Config: `~/.config/ghostty/config` |
+| default terminal | | `omarchy default terminal <alacritty\|foot\|ghostty\|kitty>` | |
 | terminal font | | | |
 
 ## Themes & customisation (advanced)
 
 | Term | Manual page | CLI commands | Gotchas |
 |------|-------------|--------------|---------|
-| custom theme | | | Create dir under `~/.config/omarchy/themes/`; stock themes at `~/.local/share/omarchy/themes/` |
-| hooks | | | Scripts in `~/.config/omarchy/hooks/{theme-set,font-set,post-update}` |
-| theme set | | | Hook receives theme name as $1 |
+| custom theme | | `omarchy theme dir <name>`, `omarchy theme install <url>` | Create/overlay a dir under `~/.config/omarchy/themes/`; stock themes at `/usr/share/omarchy/themes/` (read-only) |
+| hooks | | `omarchy hook install <type> <file>` | Scripts run from `~/.config/omarchy/hooks/`; installed via `omarchy hook install` |
+| plugins | | `omarchy plugin add <git-url>`, `omarchy plugin clone <id>` | Clone built-in shell plugins before editing; user copies live in `~/.config/omarchy/plugins/` |
 
 ## Source file locations
 
@@ -134,43 +148,27 @@ Paths users commonly search for or reference:
 
 | Path | Contains |
 |------|----------|
-| `~/.config/hypr/` | Hyprland Lua configs (bindings, monitors, input, looknfeel, envs, autostart, hypridle, hyprlock, hyprsunset) |
-| `~/.config/waybar/` | Waybar config.jsonc + style.css |
-| `~/.config/walker/config.toml` | Walker launcher config |
-| `~/.config/mako/` | Notification daemon config |
-| `~/.config/swayosd/` | On-screen display config |
-| `~/.config/omarchy/themes/` | Custom themes |
+| `~/.config/hypr/` | Hyprland Lua configs (bindings, monitors, input, looknfeel, autostart, hyprland) plus `hyprsunset.conf`, `xdph.conf` |
+| `~/.config/omarchy/shell.json` | Omarchy shell config: `bar`, `idle`, `plugins`, `version` |
+| `~/.config/omarchy/extensions/omarchy-menu.jsonc` | Quickshell menu/launcher config |
+| `~/.config/omarchy/plugins/` | User shell plugins (cloned or git-added) |
+| `~/.config/omarchy/themes/` | Custom / overlay themes |
 | `~/.config/omarchy/hooks/` | Automation hooks |
-| `~/.local/share/omarchy/themes/` | Stock themes (read-only, managed by git) |
-| `~/.local/share/omarchy/bin/` | Source scripts |
-| `~/.local/share/omarchy/config/` | Default config templates |
-| `~/.local/share/omarchy/default/` | System defaults |
-| `~/.local/share/omarchy/migrations/` | Update migrations |
-| `~/.local/share/omarchy/install/` | Installation scripts |
+| `/usr/share/omarchy/` | Package source, READ-ONLY: `bin/`, `config/`, `default/`, `themes/`, `shell/`, `migrations/`, `install/` |
+| `/usr/share/omarchy/themes/` | Stock themes (read-only, managed by the omarchy package) |
+| `$OMARCHY_PATH` | Resolves to `/usr/share/omarchy` |
 
-## Command categories
+## Command model
 
-Omarchy provides ~145 commands in 10 prefix categories:
+Omarchy ships a single `omarchy` CLI that dispatches `omarchy <group> <action>`
+to the underlying `omarchy-*` binaries (367 routes across groups such as
+`theme`, `bar`, `plugin`, `capture`, `menu`, `pkg`, `refresh`, `restart`,
+`toggle`, `system`, `update`, `hook`, `reminder`). Prefer the grouped form; the
+`omarchy-*` binaries remain on `PATH`. A few legacy binaries (e.g.
+`omarchy-debug`) exist on `PATH` but are not listed in the command tree.
 
-| Category | Pattern | Example | Count (approx) |
-|----------|---------|---------|----------------|
-| Config reset | `omarchy-refresh-*` | `omarchy-refresh-waybar` | ~10 |
-| Service restart | `omarchy-restart-*` | `omarchy-restart-waybar` | ~5 |
-| Toggle | `omarchy-toggle-*` | `omarchy-toggle-nightlight` | ~5 |
-| Theme | `omarchy-theme-*` | `omarchy-theme-set` | ~10 |
-| Install software | `omarchy-install-*` | `omarchy-install-docker-dbs` | ~10 |
-| Launch | `omarchy-launch-*` | `omarchy-launch-browser` | ~10 |
-| System command | `omarchy-cmd-*` | `omarchy-cmd-screenshot` | ~15 |
-| Package management | `omarchy-pkg-*` | `omarchy-pkg-add` | ~5 |
-| Initial setup | `omarchy-setup-*` | `omarchy-setup-fingerprint` | ~10 |
-| System updates | `omarchy-update-*` | `omarchy-update` | ~5 |
-
-Plus non-prefixed commands: `omarchy-version`, `omarchy-debug`, `omarchy-lock-screen`,
-`omarchy-menu-keybindings`, `omarchy-font-*`, `omarchy-system-*`, `omarchy-upload-log`,
-`omarchy-reinstall`.
-
-See the skill reference `skill://omarchy/references/commands.md` for the
-authoritative command list.
+List everything with `omarchy commands` (or `omarchy commands --json`); scope to
+one group with `omarchy <group> --help`.
 
 ## Related
 
