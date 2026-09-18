@@ -224,6 +224,12 @@ class TestAction:
 
 
 class TestRenderMarkdown:
+    @pytest.fixture(autouse=True)
+    def _force_color(self, monkeypatch):
+        # Exercise the colour renderer chain regardless of the runner's env.
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setenv("TERM", "xterm-256color")
+
     def test_returns_raw_text_when_no_renderer(self, monkeypatch):
         """With no renderer on PATH, the text passes through unchanged."""
         monkeypatch.setattr(picker.shutil, "which", lambda _: None)
@@ -415,3 +421,18 @@ class TestColorDegradation:
         out = picker.render_markdown("# Hi\n\nbody")
         assert out == "# Hi\n\nbody"
         assert "\x1b[" not in out
+
+    def test_render_markdown_uses_glow_notty_under_no_color(self, monkeypatch):
+        monkeypatch.setenv("NO_COLOR", "1")
+        monkeypatch.setattr(picker.shutil, "which",
+                            lambda n: "/usr/bin/glow" if n == "glow" else None)
+        calls = {}
+        monkeypatch.setattr(
+            picker.subprocess, "run",
+            lambda cmd, **k: calls.update(cmd=cmd) or types.SimpleNamespace(
+                returncode=0, stdout="PLAIN LAYOUT"),
+        )
+        out = picker.render_markdown("# Hi")
+        assert out == "PLAIN LAYOUT"
+        # notty style = no ANSI colour, layout preserved
+        assert calls["cmd"] == ["glow", "-s", "notty", "-"]
