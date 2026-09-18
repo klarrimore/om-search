@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-19
+
 ### Added
 - `NO_COLOR`, `TERM=dumb`, and a `--no-color` flag are now honored — the fzf UI, the doc renderer, and the pager all drop ANSI colour when asked. `--no-color` sets `NO_COLOR` so child processes (fzf, preview, pager) inherit it.
 - Plain output for non-interactive use: a `--print` flag emits ranked results as plain text, and om-search auto-degrades to the same when stdout is not a TTY — so `om-search --docs foo | grep …` and headless/CI use work instead of failing to open a picker.
@@ -83,7 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PyPI package metadata, MIT license, classifiers, and project URLs. (#4)
 - Development toolchain: pytest, mypy, uv build. (#1)
 
-[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/klarrimore/om-search/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/klarrimore/om-search/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/klarrimore/om-search/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/klarrimore/om-search/releases/tag/v0.1.0
