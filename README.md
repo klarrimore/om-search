@@ -61,8 +61,13 @@ om-search --groups           # browse command groups, pick one to search within
 om-search --page 04-navigation.md   # search within a specific page
 om-search --group capture    # search within a specific command group
 om-search --update           # pull the latest manual and re-index commands
+om-search --print foo        # print ranked results as plain text (no picker)
+om-search --no-color         # disable ANSI colour (also honors NO_COLOR/TERM=dumb)
 ```
 
+
+When stdout is not a terminal (e.g. piped into `grep`), the picker is skipped and
+the ranked results are printed as plain text automatically, the same as `--print`.
 On machines without the `omarchy` CLI (non-Omarchy distros), the command
 surface is disabled and doc search still works -- degraded mode.
 

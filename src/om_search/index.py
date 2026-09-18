@@ -1,7 +1,9 @@
 """Building the unified search index from manual sections and CLI commands."""
 
+import hashlib
 import json
 import re
+import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -284,6 +286,35 @@ def _section_from_dict(d: dict[str, Any]) -> Section:
     )
 
 
+def preview_key(key1: str, key2: str) -> str:
+    """Stable filename for a preview entry, keyed by (page_file, anchor)."""
+    digest = hashlib.sha1(f"{key1}\t{key2}".encode("utf-8")).hexdigest()
+    return digest[:16] + ".txt"
+
+
+def _write_previews(
+    sections: list[dict[str, Any]], page_texts: dict[str, str], previews_dir: Path
+) -> None:
+    """Write one preview file per section and per page for fast preview reads.
+
+    The picker's ``--preview`` spawns a fresh process on every selection; a
+    direct file read here avoids re-parsing the whole index each time.
+    """
+    if previews_dir.exists():
+        shutil.rmtree(previews_dir)
+    previews_dir.mkdir(parents=True, exist_ok=True)
+    for page_file, text in page_texts.items():
+        (previews_dir / preview_key(page_file, "")).write_text(
+            text, encoding="utf-8"
+        )
+    for s in sections:
+        anchor = s["anchor"]
+        if anchor:
+            (previews_dir / preview_key(s["page_file"], anchor)).write_text(
+                s["text"], encoding="utf-8"
+            )
+
+
 def build_index(mdir: Path, index_path: Path) -> None:
     """Parse all manual pages and write a pre-built JSON index.
 
@@ -305,6 +336,7 @@ def build_index(mdir: Path, index_path: Path) -> None:
     }
     index_path.parent.mkdir(parents=True, exist_ok=True)
     index_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_previews(sections, page_texts, index_path.parent / "previews")
 
 
 def load_index(index_path: Path) -> tuple[list[Section], dict[str, str]] | None:
@@ -326,6 +358,20 @@ def load_index(index_path: Path) -> tuple[list[Section], dict[str, str]] | None:
         return None
 
 
+def display_label(cand: Candidate) -> str:
+    """Human-readable one-line label for a candidate (no ANSI, no excerpt).
+
+    Shared by the fzf display field and the plain ``--print`` / non-TTY output.
+    """
+    if cand.type == "doc":
+        doc = cast(DocCandidate, cand)
+        if doc.heading:
+            return f"[doc] {doc.page_title} / {doc.heading}"
+        return f"[doc] {doc.page_title}"
+    cmd = cast(CmdCandidate, cand)
+    return f"[cmd] {cmd.path}  ::  {cmd.description}"
+
+
 def render_candidate(cand: Candidate) -> str:
     """Render a candidate as a tab-delimited fzf line.
 
@@ -345,18 +391,15 @@ def render_candidate(cand: Candidate) -> str:
     """
     if cand.type == "doc":
         doc = cast(DocCandidate, cand)
-        display = (
-            f"[doc] {doc.page_title} / {doc.heading}"
-            if doc.heading
-            else f"[doc] {doc.page_title}"
-        )
         excerpt = doc.body_excerpt or _body_excerpt(doc.text)
         shown = f"{_DIM}{excerpt}{_RESET}" if excerpt else ""
-        return "\t".join([cand.type, doc.page_file, doc.anchor, display, shown])
-    else:
-        cmd = cast(CmdCandidate, cand)
-        display = f"[cmd] {cmd.path}  ::  {cmd.description}"
-        return "\t".join([cand.type, cmd.path, cmd.description, display, ""])
+        return "\t".join(
+            [cand.type, doc.page_file, doc.anchor, display_label(cand), shown]
+        )
+    cmd = cast(CmdCandidate, cand)
+    return "\t".join(
+        [cand.type, cmd.path, cmd.description, display_label(cand), ""]
+    )
 
 
 def parse_fzf_line(line: str) -> Candidate | None:

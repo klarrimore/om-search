@@ -1,7 +1,7 @@
 """om-search CLI — entry point and orchestration."""
 
 import argparse
-import argcomplete
+import os
 import shutil
 import subprocess
 import sys
@@ -13,12 +13,14 @@ from om_search.index import (
     DocCandidate,
     build_candidates,
     build_index,
+    display_label,
     load_index,
     parse_fzf_line,
+    preview_key,
     render_candidate,
 )
 from om_search.manual import Section, list_pages, parse_manual_file
-from om_search.paths import data_dir, repo_dir, manual_dir
+from om_search.paths import data_dir, manual_dir, preview_dir, repo_dir
 from om_search.config import write_default_config
 from om_search.picker import (
     BACK,
@@ -29,6 +31,7 @@ from om_search.picker import (
     run_simple_fzf,
     view_markdown,
 )
+from om_search.theme import color_enabled
 from om_search.update import ensure_manual, update_manual
 
 # cmd_picker returns this to its caller (cmd_pages/cmd_groups) when the user
@@ -133,7 +136,17 @@ def cmd_preview(key1: str, key2: str = "") -> int:
     key1 is the page file name (for doc) or command path (for cmd).
     key2 is the anchor (for doc) or description (for cmd).
     """
-    # Try pre-built index first
+    # Fast path: a pre-rendered per-entry preview file (avoids parsing the
+    # whole index on every selection). Only docs/pages have these.
+    pfile = preview_dir() / preview_key(key1, key2)
+    if pfile.is_file():
+        try:
+            _render_text(pfile.read_text(encoding="utf-8"))
+            return 0
+        except OSError:
+            pass  # fall through to the index on any read error
+
+    # Fall back to the pre-built index.
     index_path = data_dir() / INDEX_FILENAME
     index_data = load_index(index_path)
     if index_data is not None:
@@ -180,8 +193,12 @@ def _render_text(text: str) -> None:
     """Render markdown text to the terminal with color and formatting.
 
     Tries mdcat (true markdown rendering), then bat (syntax-highlighted
-    markdown source), then falls back to plain text.
+    markdown source), then falls back to plain text. Emits no ANSI when
+    colour is disabled (NO_COLOR / TERM=dumb).
     """
+    if not color_enabled():
+        print(text)
+        return
     if shutil.which("mdcat"):
         result = subprocess.run(
             ["mdcat", "--ansi", "-"],
@@ -210,8 +227,13 @@ def cmd_picker(
     mode: str = "all",
     page_filter: str | None = None,
     group_filter: str | None = None,
+    plain: bool = False,
 ) -> int:
-    """Open the fzf fuzzy picker over the manual and commands."""
+    """Open the fzf fuzzy picker over the manual and commands.
+
+    Degrades to plain, greppable output when stdout is not a TTY or ``plain``
+    (``--print``) is set — so `om-search … | grep` and headless/CI use work.
+    """
     mdir = _ensure_manual()
     sections = _load_sections(mdir)
     commands = find_commands()
@@ -223,11 +245,17 @@ def cmd_picker(
         group_filter,
         query,
     )
-    lines = [render_candidate(c) for c in candidates]
 
-    if not lines:
+    if not candidates:
         print("No content indexed.", file=sys.stderr)
         return 1
+
+    if plain or not sys.stdout.isatty():
+        for c in candidates:
+            print(display_label(c))
+        return 0
+
+    lines = [render_candidate(c) for c in candidates]
 
     # Docs are now read inside the picker (Enter = reading mode in the right
     # pane; Ctrl-O = full pager), so the picker returns only for a command
@@ -407,6 +435,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Write a default config to ~/.config/om-search/config.toml and exit",
     )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        default=False,
+        help="Disable ANSI colour (also honors NO_COLOR and TERM=dumb)",
+    )
+    parser.add_argument(
+        "--print",
+        dest="plain",
+        action="store_true",
+        default=False,
+        help="Print ranked results as plain text instead of opening the picker",
+    )
     return parser
 
 
@@ -422,8 +463,17 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_open(argv[1], argv[2] if len(argv) > 2 else "")
 
     parser = build_parser()
-    argcomplete.autocomplete(parser)
+    # argcomplete only acts during shell completion (when the shell sets
+    # _ARGCOMPLETE); importing it lazily keeps it off the normal startup path.
+    if os.environ.get("_ARGCOMPLETE"):
+        import argcomplete
+        argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
+
+    # A --no-color flag disables colour everywhere by setting NO_COLOR, which
+    # child processes (fzf, the preview/pager subprocesses) inherit.
+    if args.no_color:
+        os.environ["NO_COLOR"] = "1"
 
     query = " ".join(args.query)
 
@@ -463,4 +513,5 @@ def main(argv: list[str] | None = None) -> int:
         mode=mode,
         page_filter=args.page,
         group_filter=args.group,
+        plain=args.plain,
     )

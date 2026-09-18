@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `NO_COLOR`, `TERM=dumb`, and a `--no-color` flag are now honored — the fzf UI, the doc renderer, and the pager all drop ANSI colour when asked. `--no-color` sets `NO_COLOR` so child processes (fzf, preview, pager) inherit it.
+- Plain output for non-interactive use: a `--print` flag emits ranked results as plain text, and om-search auto-degrades to the same when stdout is not a TTY — so `om-search --docs foo | grep …` and headless/CI use work instead of failing to open a picker.
+
+### Changed
+- Preview latency roughly halved (~55ms → ~35ms per selection): `build_index` now writes a per-entry preview file, and the preview path reads that file directly instead of parsing the whole 426KB index on every cursor move. Run `om-search --update` (or the pacman hook) to generate the preview files.
+- Faster startup: `argcomplete` is imported only during shell completion, off the normal launch path.
+
 ## [0.3.0] - 2026-09-19
 
 ### Fixed

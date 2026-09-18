@@ -84,3 +84,24 @@ class TestFzfColorSpec:
         assert "bg:#123456" in spec
         # No foreground token -> no fg role emitted
         assert "fg:#" not in spec
+
+
+class TestColorEnabled:
+    def test_enabled_by_default(self, monkeypatch):
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setenv("TERM", "xterm-256color")
+        assert theme.color_enabled() is True
+
+    def test_no_color_env_disables(self, monkeypatch):
+        monkeypatch.setenv("NO_COLOR", "1")
+        assert theme.color_enabled() is False
+
+    def test_no_color_env_disables_even_when_empty(self, monkeypatch):
+        # Per the NO_COLOR spec, presence disables regardless of value.
+        monkeypatch.setenv("NO_COLOR", "")
+        assert theme.color_enabled() is False
+
+    def test_dumb_terminal_disables(self, monkeypatch):
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setenv("TERM", "dumb")
+        assert theme.color_enabled() is False

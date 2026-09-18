@@ -7,6 +7,7 @@ theme the desktop is on, switching automatically when the user changes themes.
 Falls back to a built-in Catppuccin Mocha palette off Omarchy.
 """
 
+import os
 import tomllib
 from pathlib import Path
 
@@ -27,6 +28,19 @@ CATPPUCCIN_MOCHA: dict[str, str] = {
     "green": "#a6e3a1",
     "bright_blue": "#74c7ec",
 }
+
+
+def color_enabled() -> bool:
+    """Whether ANSI colour should be emitted at all.
+
+    Honors the ``NO_COLOR`` convention (presence disables, regardless of value)
+    and ``TERM=dumb``. Applies to the fzf UI and the markdown renderers alike.
+    """
+    if "NO_COLOR" in os.environ:
+        return False
+    if os.environ.get("TERM") == "dumb":
+        return False
+    return True
 
 
 def load_palette(theme_dir: Path | None = None) -> dict[str, str] | None:

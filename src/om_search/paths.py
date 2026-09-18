@@ -17,6 +17,13 @@ def repo_dir() -> Path:
     return data_dir() / "omarchy-repo"
 
 
+def preview_dir() -> Path:
+    """Return the directory of pre-rendered preview files (created if needed)."""
+    d = data_dir() / "previews"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def manual_dir() -> Path:
     """Return the path to the manual files inside the cloned repo."""
     return repo_dir() / "manual"

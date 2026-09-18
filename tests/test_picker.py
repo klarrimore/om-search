@@ -391,3 +391,27 @@ class TestViewMarkdownJump:
         assert "quit" in Path(env["LESSKEYIN"]).read_text(encoding="utf-8")
         # prompt advertises the back key
         assert any("back" in a for a in calls["cmd"])
+
+
+class TestColorDegradation:
+    def test_fzf_uses_bw_under_no_color(self, monkeypatch):
+        monkeypatch.setenv("NO_COLOR", "1")
+        args = picker._base_fzf_args(Config(theme_source="omarchy"))
+        assert args[args.index("--color") + 1] == "bw"
+        # No palette hex color spec is emitted.
+        assert not any("#" in a for a in args)
+
+    def test_fzf_uses_palette_when_color_enabled(self, monkeypatch):
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setenv("TERM", "xterm-256color")
+        args = picker._base_fzf_args(Config(theme_source="catppuccin"))
+        spec = args[args.index("--color") + 1]
+        assert "#" in spec and spec != "bw"
+
+    def test_render_markdown_plain_under_no_color(self, monkeypatch):
+        monkeypatch.setenv("NO_COLOR", "1")
+        # No glow available -> raw text, and never ANSI.
+        monkeypatch.setattr(picker.shutil, "which", lambda _: None)
+        out = picker.render_markdown("# Hi\n\nbody")
+        assert out == "# Hi\n\nbody"
+        assert "\x1b[" not in out

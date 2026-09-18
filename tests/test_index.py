@@ -6,7 +6,9 @@ from om_search.index import (
     _body_excerpt,
     build_candidates,
     build_index,
+    display_label,
     load_index,
+    preview_key,
     render_candidate,
     parse_fzf_line,
 )
@@ -373,3 +375,47 @@ def test_load_version_mismatch_returns_none(tmp_path):
     index_path = tmp_path / "index.json"
     index_path.write_text('{"version": 999, "sections": [], "page_texts": {}}')
     assert load_index(index_path) is None
+
+
+class TestDisplayLabelGolden:
+    """Stable, width-agnostic labels including wide/CJK/emoji graphemes."""
+
+    def test_ascii_doc_and_command(self):
+        doc = DocCandidate(page_title="Navigation", heading="Grouping windows")
+        cmd = CmdCandidate(path="omarchy theme set", description="Apply a theme")
+        assert display_label(doc) == "[doc] Navigation / Grouping windows"
+        assert display_label(cmd) == "[cmd] omarchy theme set  ::  Apply a theme"
+
+    def test_doc_without_heading(self):
+        assert display_label(DocCandidate(page_title="Welcome")) == "[doc] Welcome"
+
+    def test_cjk_thai_emoji_labels_are_preserved(self):
+        # Wide/CJK/Thai/emoji graphemes pass through verbatim (fzf handles
+        # display width; the label must not be truncated or mangled here).
+        doc = DocCandidate(page_title="导航 ナビ", heading="สวัสดี 🚀")
+        assert display_label(doc) == "[doc] 导航 ナビ / สวัสดี 🚀"
+
+
+class TestPreviewFiles:
+    def test_preview_key_is_deterministic_and_distinct(self):
+        a = preview_key("04.md", "nav")
+        assert a == preview_key("04.md", "nav")
+        assert a.endswith(".txt")
+        assert a != preview_key("04.md", "other")
+        assert a != preview_key("05.md", "nav")
+
+    def test_build_writes_preview_files(self, tmp_path):
+        mdir = tmp_path / "manual"
+        mdir.mkdir()
+        (mdir / "04-nav.md").write_text(
+            "# Navigation\n\nintro\n\n### Grouping windows\n\nbody here\n",
+            encoding="utf-8",
+        )
+        index_path = tmp_path / "index.json"
+        build_index(mdir, index_path)
+        previews = index_path.parent / "previews"
+        # Full-page preview (empty anchor) and the H3 section preview exist.
+        page = previews / preview_key("04-nav.md", "")
+        section = previews / preview_key("04-nav.md", "grouping-windows")
+        assert "body here" in page.read_text(encoding="utf-8")
+        assert "Grouping windows" in section.read_text(encoding="utf-8")

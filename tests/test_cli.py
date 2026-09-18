@@ -217,6 +217,18 @@ class TestMainDispatch:
         assert got["page_filter"] == "04.md"
         assert got["group_filter"] == "capture"
 
+    def test_print_flag_forwarded_to_picker(self, monkeypatch):
+        got = {}
+        monkeypatch.setattr(cli, "cmd_picker", lambda **kw: got.update(kw) or 0)
+        cli.main(["--print", "theme"])
+        assert got["plain"] is True
+
+    def test_no_color_flag_sets_env(self, monkeypatch):
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr(cli, "cmd_picker", lambda **kw: 0)
+        cli.main(["--no-color", "x"])
+        assert cli.os.environ.get("NO_COLOR") == "1"
+
 
 class TestCmdUpdate:
     def test_returns_1_when_update_fails(self, monkeypatch, capsys):
@@ -261,6 +273,8 @@ class TestCmdPicker:
         monkeypatch.setattr(cli, "find_commands", lambda: [])
         monkeypatch.setattr(cli, "build_candidates", lambda *a, **k: candidates)
         monkeypatch.setattr(cli, "render_candidate", lambda c: "line")
+        # Default to the interactive path; plain-mode tests override this.
+        monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: True)
 
     def test_no_candidates_returns_1(self, monkeypatch, tmp_path, capsys):
         self._stub_env(monkeypatch, tmp_path, [])
@@ -323,6 +337,33 @@ class TestCmdPicker:
         monkeypatch.setattr(cli, "run_fzf", lambda *a, **k: "garbage")
         monkeypatch.setattr(cli, "parse_fzf_line", lambda s: None)
         assert cli.cmd_picker() == 0
+
+    def test_print_flag_emits_plain_labels(self, monkeypatch, tmp_path, capsys):
+        cands = [
+            DocCandidate(page_title="Navigation", heading="Grouping windows"),
+            CmdCandidate(path="omarchy theme set", description="Apply a theme"),
+        ]
+        self._stub_env(monkeypatch, tmp_path, cands)
+        monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: True)  # flag, not tty
+        monkeypatch.setattr(
+            cli, "run_fzf",
+            lambda *a, **k: pytest.fail("fzf must not run for --print"),
+        )
+        assert cli.cmd_picker(plain=True) == 0
+        out = capsys.readouterr().out
+        assert "[doc] Navigation / Grouping windows" in out
+        assert "[cmd] omarchy theme set  ::  Apply a theme" in out
+
+    def test_non_tty_degrades_to_plain(self, monkeypatch, tmp_path, capsys):
+        cands = [CmdCandidate(path="omarchy x", description="d")]
+        self._stub_env(monkeypatch, tmp_path, cands)
+        monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: False)
+        monkeypatch.setattr(
+            cli, "run_fzf",
+            lambda *a, **k: pytest.fail("fzf must not run when stdout is not a tty"),
+        )
+        assert cli.cmd_picker() == 0
+        assert "[cmd] omarchy x" in capsys.readouterr().out
 
     def test_scoped_picker_back_returns_go_back(self, monkeypatch, tmp_path):
         self._stub_env(monkeypatch, tmp_path, ["c"])
@@ -424,6 +465,13 @@ class TestCmdGroups:
 
 
 class TestRenderText:
+    @pytest.fixture(autouse=True)
+    def _force_color(self, monkeypatch):
+        # These exercise the colour renderers; keep them on regardless of the
+        # ambient NO_COLOR/TERM the test runner may carry.
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setenv("TERM", "xterm-256color")
+
     def test_prefers_mdcat(self, monkeypatch, capsys):
         monkeypatch.setattr(cli.shutil, "which",
                             lambda n: "/usr/bin/mdcat" if n == "mdcat" else None)
@@ -449,6 +497,15 @@ class TestRenderText:
         monkeypatch.setattr(cli.shutil, "which", lambda n: None)
         cli._render_text("plain text")
         assert "plain text" in capsys.readouterr().out
+
+    def test_no_color_emits_plain_no_subprocess(self, monkeypatch, capsys):
+        monkeypatch.setenv("NO_COLOR", "1")
+        monkeypatch.setattr(
+            cli.subprocess, "run",
+            lambda *a, **k: pytest.fail("no renderer subprocess under NO_COLOR"),
+        )
+        cli._render_text("# hi\n\nbody")
+        assert capsys.readouterr().out == "# hi\n\nbody\n"
 
 
 class TestCmdPreview:
@@ -483,6 +540,21 @@ class TestCmdPreview:
         monkeypatch.setattr(cli, "_render_text", lambda t: rendered.update(t=t))
         assert cli.cmd_preview("04.md", "missing-anchor") == 0
         assert rendered["t"] == "PAGE"
+
+    def test_preview_file_fast_path_skips_index(self, monkeypatch):
+        from om_search.index import preview_key
+        from om_search.paths import preview_dir
+        (preview_dir() / preview_key("04.md", "nav")).write_text(
+            "FAST SECTION", encoding="utf-8"
+        )
+        rendered = {}
+        monkeypatch.setattr(cli, "_render_text", lambda t: rendered.update(t=t))
+        monkeypatch.setattr(
+            cli, "load_index",
+            lambda p: pytest.fail("fast path must not parse the index"),
+        )
+        assert cli.cmd_preview("04.md", "nav") == 0
+        assert rendered["t"] == "FAST SECTION"
 
 
 class TestCmdOpen:

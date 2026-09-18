@@ -17,7 +17,7 @@ from om_search.index import (
 )
 from om_search.manual import parse_manual_file
 from om_search.paths import config_path, data_dir, manual_dir
-from om_search.theme import fzf_color_spec, resolve_palette
+from om_search.theme import color_enabled, fzf_color_spec, resolve_palette
 
 
 def section_text(cand: DocCandidate) -> str:
@@ -121,6 +121,19 @@ def render_markdown(text: str) -> str:
     and code; falls back to syntax-highlighted source (bat); finally returns
     the text unchanged. Never raises — a failing renderer is skipped.
     """
+    if not color_enabled():
+        # No-colour terminals: keep layout (glow's notty style) but no ANSI.
+        if shutil.which("glow"):
+            try:
+                result = subprocess.run(
+                    ["glow", "-s", "notty", "-"],
+                    input=text, capture_output=True, text=True,
+                )
+                if result.returncode == 0 and result.stdout:
+                    return result.stdout
+            except OSError:
+                pass
+        return text
     renderers = [
         ["glow", "-s", "auto", "-"],
         ["mdcat", "--ansi", "-"],
@@ -254,9 +267,11 @@ def keys_cheatsheet(cfg: Config | None = None) -> str:
             continue
         lines.append(f"  {label:<20} {_fmt_key(key)}")
     lines += [
-        "  Quit                 Esc",
+        "  Open full page       Ctrl + O",
+        "  Back / quit          Esc  (also Ctrl + C)",
         "",
         "Type to fuzzy-search titles and body text.",
+        "(q is search input here, not quit — use Esc.)",
         f"Rebind in {config_path()}",
     ]
     return "\n".join(lines) + "\n"
@@ -273,11 +288,14 @@ def _base_fzf_args(cfg: Config) -> list[str]:
         "--marker=✓",
         "--info=inline",
     ]
-    palette = resolve_palette(cfg.theme_source, cfg.theme_custom)
-    if palette:
-        spec = fzf_color_spec(palette)
-        if spec:
-            args += ["--color", spec]
+    if not color_enabled():
+        args += ["--color", "bw"]
+    else:
+        palette = resolve_palette(cfg.theme_source, cfg.theme_custom)
+        if palette:
+            spec = fzf_color_spec(palette)
+            if spec:
+                args += ["--color", spec]
     for bind in cfg.movement_binds():
         args += ["--bind", bind]
     return args
