@@ -1,5 +1,7 @@
 """fzf integration: preview rendering and post-selection actions."""
 
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -53,6 +55,52 @@ def section_text(cand: DocCandidate) -> str:
     return sections[0].text if sections else ""
 
 
+def page_text(cand: DocCandidate) -> str:
+    """Read the whole page for a doc candidate (for the open action).
+
+    Opening a result shows the entire page — not just the matched
+    subsection — so the reader keeps surrounding context and can scroll to
+    adjacent sections. :func:`view_markdown` positions the pager at the
+    matched heading. Prefers the pre-built index, falls back to disk.
+    """
+    index_data = load_index(data_dir() / INDEX_FILENAME)
+    if index_data is not None:
+        _, page_texts = index_data
+        full = page_texts.get(cand.page_file)
+        if full:
+            return full
+    path = manual_dir() / cand.page_file
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def heading_line(rendered: str, heading: str) -> int:
+    """Return the 1-based line of ``heading`` in ``rendered`` output, or 0.
+
+    Renderers (notably glow) inject ANSI resets *between* words, so a literal
+    pager search for the heading text fails. Instead we scan the ANSI-stripped
+    lines and match the heading phrase on a line that still carries its ``#``
+    markers, which distinguishes the heading from body mentions.
+    """
+    target = re.sub(r"\s+", " ", heading).strip()
+    if not target:
+        return 0
+    fallback = 0
+    for i, line in enumerate(rendered.splitlines(), start=1):
+        clean = re.sub(r"\s+", " ", _ANSI_RE.sub("", line)).strip()
+        if target in clean:
+            if "#" in clean:
+                return i
+            if not fallback:
+                fallback = i
+    return fallback
+
+
 def action_for(cand: Candidate) -> tuple[str, str]:
     """Return (kind, payload) for a selected candidate.
 
@@ -61,7 +109,7 @@ def action_for(cand: Candidate) -> tuple[str, str]:
     ``cmd`` -> ``("echo", path)``       — printed to stdout for the shell.
     """
     if cand.type == "doc":
-        return ("view", section_text(cast(DocCandidate, cand)))
+        return ("view", page_text(cast(DocCandidate, cand)))
     cmd = cast(CmdCandidate, cand)
     return ("echo", cmd.path)
 
@@ -93,20 +141,61 @@ def render_markdown(text: str) -> str:
     return text
 
 
-def view_markdown(text: str) -> None:
+_ESC_LESSKEY_SRC = "#command\n\\e quit\n"
+
+
+def _esc_lesskey_file() -> str | None:
+    """Write (once) a lesskey source binding Esc -> quit; return its path.
+
+    less >= 582 reads key bindings from the file named by ``LESSKEYIN``. This
+    makes Esc quit the pager so it acts as a "back" key (returning to the
+    picker loop); arrow keys still scroll because less longest-matches their
+    escape sequences. Older less ignores ``LESSKEYIN`` and simply keeps ``q``.
+    """
+    try:
+        path = data_dir() / "esc.lesskey"
+        if path.read_text(encoding="utf-8") != _ESC_LESSKEY_SRC:
+            path.write_text(_ESC_LESSKEY_SRC, encoding="utf-8")
+        return str(path)
+    except FileNotFoundError:
+        try:
+            path.write_text(_ESC_LESSKEY_SRC, encoding="utf-8")
+            return str(path)
+        except OSError:
+            return None
+    except OSError:
+        return None
+
+
+# Bottom-line pager prompt: advertise that Esc/q go back, plus scroll/search.
+# The short-prompt slot (-Ps) is the one less shows for piped stdin.
+_LESS_PROMPT = "-Psq/Esc: back  \u00b7  \u2191\u2193/jk: scroll  \u00b7  /: search"
+
+
+def view_markdown(text: str, jump_to: str | None = None) -> None:
     """Render markdown and show it in an interactive pager when possible.
 
-    Renders with :func:`render_markdown`, then pages through ``less -R`` so
-    the output is both pretty and scrollable/searchable. ``-F`` prints
-    directly (no pager) when the content fits one screen; ``-X`` keeps it in
-    the scrollback. Falls back to writing to stdout when there is no TTY or
-    no ``less``.
+    Renders with :func:`render_markdown`, then pages through ``less``. When
+    ``jump_to`` (a heading) is given, the pager opens positioned at that
+    section via ``+<line>`` so the reader lands on the match but can scroll
+    for surrounding context. Esc (as well as ``q``) quits the pager so it acts
+    as a "back" key, returning to the picker; a prompt line advertises this.
+    ``-R`` keeps ANSI colour; the pager uses the alternate screen (no ``-X``)
+    so quitting restores the caller's screen for a clean return to fzf. Falls
+    back to writing to stdout when there is no TTY or no ``less``.
     """
     rendered = render_markdown(text)
     if sys.stdout.isatty() and shutil.which("less"):
-        subprocess.run(
-            ["less", "-R", "-F", "-X"], input=rendered.encode(), check=False
-        )
+        args = ["less", "-R", _LESS_PROMPT]
+        if jump_to:
+            line = heading_line(rendered, jump_to)
+            if line:
+                args.append(f"+{line}")
+        env = os.environ.copy()
+        keyfile = _esc_lesskey_file()
+        if keyfile:
+            env["LESSKEYIN"] = keyfile
+        subprocess.run(args, input=rendered.encode(), env=env, check=False)
         return
     if not rendered.endswith("\n"):
         rendered += "\n"
@@ -133,7 +222,7 @@ def picker_header(
         parts.append(f"group: {group_filter}")
 
     scope = ", ".join(parts)
-    return f"Mode: {scope}  |  Enter: open  |  Ctrl-Y: copy command"
+    return f"Mode: {scope}  |  Enter: read  ·  Ctrl+O: full page  ·  Ctrl+Y: copy"
 
 
 # Friendly labels for the help cheatsheet, in display order.
@@ -199,7 +288,62 @@ def _nav_hint(cfg: Config) -> str:
     down = _fmt_key(cfg.keys.get("down", "ctrl-j"))
     up = _fmt_key(cfg.keys.get("up", "ctrl-k"))
     help_key = cfg.keys.get("help", "?")
-    return f"{down}/{up} move · Enter open · {help_key} keys · Esc quit"
+    return f"{down}/{up} move · Enter read · Ctrl+O full page · {help_key} keys · Esc quit"
+
+
+BACK = "\x00BACK\x00"  # sentinel: user asked to pop back to the parent list
+
+# Reading mode: Enter on a doc enlarges the preview and remaps movement keys
+# to scroll it, emulating "focus the right pane" (fzf has no real focus-preview
+# action). The mode flag is carried in the prompt so `transform` binds can test
+# it; Esc leaves reading mode and Ctrl-O opens the full page in the pager.
+_READING_MARK = "reading"
+_READING_PROMPT = "  reading — Esc: back · Ctrl+O: full page  "
+_NORMAL_PROMPT = "  "
+_READ_WIN = "right,90%,wrap,border-rounded"
+_NORMAL_WIN = "right,60%,wrap,border-rounded"
+
+
+def _reading_binds(cfg: Config) -> list[str]:
+    """fzf --bind args implementing modal reading mode over the preview pane."""
+    k = cfg.keys
+
+    def modal(key: str, prev: str, lst: str) -> list[str]:
+        return [
+            "--bind",
+            f"{key}:transform:[[ $FZF_PROMPT == *{_READING_MARK}* ]] "
+            f"&& echo {prev} || echo {lst}",
+        ]
+
+    binds: list[str] = [
+        # Enter: a doc opens in the (enlarged) right pane; a command is accepted.
+        "--bind",
+        "enter:transform:[[ {1} == doc ]] && "
+        f'echo "change-preview(om-search preview {{2}})'
+        f"+change-preview-window({_READ_WIN})"
+        f'+change-prompt({_READING_PROMPT})" || echo accept',
+        # Esc: leave reading mode (restore pane), else abort (caller = back/quit).
+        "--bind",
+        f"esc:transform:[[ $FZF_PROMPT == *{_READING_MARK}* ]] && "
+        f'echo "change-preview(om-search preview {{2}} {{3}})'
+        f"+change-preview-window({_NORMAL_WIN})"
+        f'+change-prompt({_NORMAL_PROMPT})" || echo abort',
+        # Ctrl-O: open the full page in the scrollable pager (docs only).
+        "--bind",
+        'ctrl-o:transform:[[ {1} == doc ]] && echo "execute(om-search open {2} {3})"',
+    ]
+    # While reading, movement keys scroll the preview instead of the list.
+    binds += modal(k.get("down", "ctrl-j"), "preview-down", "down")
+    binds += modal(k.get("up", "ctrl-k"), "preview-up", "up")
+    binds += modal(k.get("half_page_down", "ctrl-d"),
+                   "preview-half-page-down", "half-page-down")
+    binds += modal(k.get("half_page_up", "ctrl-u"),
+                   "preview-half-page-up", "half-page-up")
+    binds += modal("down", "preview-down", "down")
+    binds += modal("up", "preview-up", "up")
+    binds += modal("pgdn", "preview-page-down", "page-down")
+    binds += modal("pgup", "preview-page-up", "page-up")
+    return binds
 
 
 def run_fzf(
@@ -209,6 +353,7 @@ def run_fzf(
     page_filter: str | None = None,
     group_filter: str | None = None,
     cfg: Config | None = None,
+    back: bool = False,
 ) -> str | None:
     """Run fzf over the rendered candidates, returning the selected line.
 
@@ -217,10 +362,17 @@ def run_fzf(
     searched via ``--with-nth 4,5`` so body content is discoverable — fzf
     only matches text it presents, so the excerpt must be shown to be found.
     The UI is themed to the active Omarchy theme and keys come from config.
+
+    When ``back`` is set (a scoped picker drilled in from a page/group list),
+    Left arrow and Esc return the :data:`BACK` sentinel so the caller can pop
+    back to its parent list instead of exiting.
     """
     cfg = cfg or load_config()
     preview_cmd = "om-search preview {2} {3}"
-    header = f"{picker_header(mode, page_filter, group_filter)}\n{_nav_hint(cfg)}"
+    nav = _nav_hint(cfg)
+    if back:
+        nav += " · ←: back"
+    header = f"{picker_header(mode, page_filter, group_filter)}\n{nav}"
 
     cmd = ["fzf"]
     cmd += _base_fzf_args(cfg)
@@ -238,6 +390,9 @@ def run_fzf(
         "--header",
         header,
     ]
+    if back:
+        # Left arrow becomes an accept key reported on the first output line.
+        cmd += ["--expect", "left"]
 
     copy = cfg.keys.get("copy")
     if copy:
@@ -248,6 +403,11 @@ def run_fzf(
         # re-runs --preview and restores the doc, giving a natural toggle.
         cmd += ["--bind", f"{help_key}:change-preview(om-search --keys)"]
 
+    # Modal reading mode (Enter=read in pane, movement scrolls it, Esc=back,
+    # Ctrl-O=full pager). Appended last so it overrides the plain movement
+    # binds from _base_fzf_args (fzf uses the last bind for a key).
+    cmd += _reading_binds(cfg)
+
     if query:
         cmd.extend(["--query", query])
 
@@ -257,6 +417,15 @@ def run_fzf(
         text=True,
         capture_output=True,
     )
+    if back:
+        lines = proc.stdout.split("\n")
+        key = lines[0].strip() if lines else ""
+        if key == "left" or proc.returncode == 130:  # Left or Esc/Ctrl-C
+            return BACK
+        for line in lines[1:]:
+            if line.strip():
+                return line.strip()
+        return None
     out = proc.stdout.strip()
     return out or None
 

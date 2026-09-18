@@ -10,6 +10,7 @@ from pathlib import Path
 from om_search.commands import Command, list_groups, parse_commands_json
 from om_search.index import (
     INDEX_FILENAME,
+    DocCandidate,
     build_candidates,
     build_index,
     load_index,
@@ -20,13 +21,19 @@ from om_search.manual import Section, list_pages, parse_manual_file
 from om_search.paths import data_dir, repo_dir, manual_dir
 from om_search.config import write_default_config
 from om_search.picker import (
+    BACK,
     action_for,
     keys_cheatsheet,
+    page_text,
     run_fzf,
     run_simple_fzf,
     view_markdown,
 )
 from om_search.update import ensure_manual, update_manual
+
+# cmd_picker returns this to its caller (cmd_pages/cmd_groups) when the user
+# asked to pop back to the parent list rather than exit.
+GO_BACK = -1
 
 
 def find_commands() -> list[Command]:
@@ -94,6 +101,26 @@ def cmd_update() -> int:
         print(f"{len(cmds)} commands indexed.")
     else:
         print("Command tree not available (degraded mode).")
+    return 0
+
+
+def cmd_open(page_file: str, anchor: str = "") -> int:
+    """Open a full manual page in the pager, positioned at a section.
+
+    Internal command invoked by the picker's Ctrl-O binding. Resolves the
+    heading for ``anchor`` so :func:`view_markdown` can jump to it.
+    """
+    heading = ""
+    index_data = load_index(data_dir() / INDEX_FILENAME)
+    sections = index_data[0] if index_data is not None else _load_sections(manual_dir())
+    for s in sections:
+        if s.page_file == page_file and s.anchor == anchor:
+            heading = s.heading
+            break
+    cand = DocCandidate(
+        page_file=page_file, anchor=anchor, page_title="", heading=heading
+    )
+    view_markdown(page_text(cand), jump_to=heading or None)
     return 0
 
 
@@ -202,19 +229,25 @@ def cmd_picker(
         print("No content indexed.", file=sys.stderr)
         return 1
 
-    selected = run_fzf(lines, query, mode, page_filter, group_filter)
+    # Docs are now read inside the picker (Enter = reading mode in the right
+    # pane; Ctrl-O = full pager), so the picker returns only for a command
+    # selection or a back/cancel. A scoped picker (drilled in from a page or
+    # group list) lets Left/Esc pop back to that list.
+    scoped = bool(page_filter or group_filter)
+    selected = run_fzf(lines, query, mode, page_filter, group_filter, back=scoped)
+    if selected == BACK:
+        return GO_BACK
     if selected is None:
         return 0
-
     cand = parse_fzf_line(selected)
     if cand is None:
         return 0
-
     kind, payload = action_for(cand)
     if kind == "echo":
         print(payload)
     else:
-        view_markdown(payload)
+        # Fallback: a doc came back (e.g. no reading binds) — open the pager.
+        view_markdown(payload, jump_to=getattr(cand, "heading", "") or None)
     return 0
 
 
@@ -259,14 +292,16 @@ def cmd_pages(query: str = "") -> int:
         for p in pages
     ]
     header = "Pick a page to search within  |  Enter: select  |  Esc/Ctrl-C: cancel"
-    selected = run_simple_fzf(items, header=header, query=query)
-
-    if selected is None:
-        return 0
-
-    # Extract the page file from the selected line (last parenthesised chunk)
-    page_file = selected.rsplit("(", 1)[-1].rstrip(")")
-    return cmd_picker(mode="doc", page_filter=page_file)
+    while True:
+        selected = run_simple_fzf(items, header=header, query=query)
+        if selected is None:
+            return 0
+        # Extract the page file from the selected line (last parenthesised chunk)
+        page_file = selected.rsplit("(", 1)[-1].rstrip(")")
+        result = cmd_picker(mode="doc", page_filter=page_file)
+        if result != GO_BACK:
+            return result
+        # else: user pressed ←/Esc in the scoped picker — reshow the page list
 
 
 def cmd_groups(query: str = "") -> int:
@@ -280,13 +315,15 @@ def cmd_groups(query: str = "") -> int:
     groups = list_groups(commands)
     items = [f"omarchy {g}" for g in groups]
     header = "Pick a group to search within  |  Enter: select  |  Esc/Ctrl-C: cancel"
-    selected = run_simple_fzf(items, header=header, query=query)
-
-    if selected is None:
-        return 0
-
-    group = selected.removeprefix("omarchy ")
-    return cmd_picker(mode="cmd", group_filter=group)
+    while True:
+        selected = run_simple_fzf(items, header=header, query=query)
+        if selected is None:
+            return 0
+        group = selected.removeprefix("omarchy ")
+        result = cmd_picker(mode="cmd", group_filter=group)
+        if result != GO_BACK:
+            return result
+        # else: user pressed ←/Esc in the scoped picker — reshow the group list
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -381,6 +418,8 @@ def main(argv: list[str] | None = None) -> int:
     # with raw positional args and no flags.
     if argv and argv[0] == "preview" and len(argv) >= 2:
         return cmd_preview(argv[1], argv[2] if len(argv) > 2 else "")
+    if argv and argv[0] == "open" and len(argv) >= 2:
+        return cmd_open(argv[1], argv[2] if len(argv) > 2 else "")
 
     parser = build_parser()
     argcomplete.autocomplete(parser)

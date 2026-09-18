@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-19
+
+### Fixed
+- Doc navigation: the manual parser now splits sections on `###` (H3) as well as `##` (H2). The current Omarchy manual uses H3 for most subsections, so 24 of 51 pages previously collapsed into a single unnavigable blob — every doc hit opened the whole page instead of the matched subsection. Sectioning the manual this way takes it from 186 to 301 searchable sections. Rebuild the local index with `om-search --update` to pick up the finer sections.
+- Doc viewer "back" key: pressing Esc in an open doc now returns to the picker (a `LESSKEYIN` binding maps Esc to quit `less`; arrow keys still scroll because less longest-matches their escape sequences). Previously only `q` closed the pager and Esc did nothing, so there was no working back button. A bottom prompt now advertises `q/Esc: back · ↑↓/jk: scroll · /: search`.
+- Drill-down "back": in the `--pages`/`--groups` flow, pressing Left (or Esc) in the scoped picker now returns to the page/group list instead of exiting, so you can browse into a page, back out, and pick another. The header advertises `←: back`.
+
+### Changed
+- Doc reading: pressing Enter on a doc now opens it in the **right pane** and gives that pane focus — the preview enlarges and the movement keys (Ctrl-J/K, arrows, PgUp/Dn) scroll it, with Esc returning to the list. This "reading mode" is emulated with fzf `transform` binds keyed off the prompt, since fzf has no native focus-preview action. **Ctrl-O** opens the full page in the scrollable `less` pager instead, positioned at the matched heading (via `less +<line>` computed from the rendered output so it works through glow's ANSI styling); Esc/`q` return to the picker. Selecting a command still accepts and prints it.
+- Omarchy menu plugin: added nerd-font icons to every Manual row, trimmed the submenu from six rows to four (dropped the redundant scoped `--docs`/`--cmds` searches, which Search already covers), and switched the interactive pickers to `omarchy-launch-or-focus-tui` with per-mode `--app-id`s so re-opening a mode focuses its existing window instead of spawning a new terminal.
+
 ## [0.2.0] - 2026-09-18
 
 ### Added
@@ -64,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PyPI package metadata, MIT license, classifiers, and project URLs. (#4)
 - Development toolchain: pytest, mypy, uv build. (#1)
 
-[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/klarrimore/om-search/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/klarrimore/om-search/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/klarrimore/om-search/releases/tag/v0.1.0

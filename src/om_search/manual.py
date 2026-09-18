@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 H1_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
-H2_RE = re.compile(r"^##\s+(.+?)\s*\[?#?\]?\s*$", re.MULTILINE)
+HEADING_RE = re.compile(r"^(#{2,3})\s+(.+?)\s*\[?#?\]?\s*$", re.MULTILINE)
 ANCHOR_CHARS_RE = re.compile(r"[^a-z0-9\s-]")
 
 
@@ -59,9 +59,11 @@ def list_pages(mdir: Path) -> list[PageInfo]:
 def parse_manual_file(path: Path) -> list[Section]:
     """Split one manual page into sections.
 
-    The page title comes from the first H1. The text before the first H2
-    becomes the intro section (empty heading). Each H2 opens a new section
-    that runs until the next H2.
+    The page title comes from the first H1. The text before the first
+    subheading becomes the intro section (empty heading). Each H2 or H3
+    heading opens a new section that runs until the next heading of either
+    level. (The Omarchy manual uses H3 for most subsections and only
+    sometimes H2, so both must act as boundaries.)
     """
     text = path.read_text(encoding="utf-8")
     page_file = path.name
@@ -70,22 +72,26 @@ def parse_manual_file(path: Path) -> list[Section]:
     title_match = H1_RE.search(text)
     page_title = title_match.group(1).strip() if title_match else page_file
 
-    h2_matches = list(H2_RE.finditer(text))
+    heading_matches = list(HEADING_RE.finditer(text))
     sections: list[Section] = []
 
-    if not h2_matches:
+    if not heading_matches:
         return [Section(page_file, page_number, page_title, "", "", text.strip())]
 
-    intro_text = text[: h2_matches[0].start()].strip()
+    intro_text = text[: heading_matches[0].start()].strip()
     if intro_text:
-        intro_heading = ""
         sections.append(
-            Section(page_file, page_number, page_title, intro_heading, "", intro_text)
+            Section(page_file, page_number, page_title, "", "", intro_text)
         )
 
-    for i, match in enumerate(h2_matches):
-        heading = match.group(1).strip()
-        end = h2_matches[i + 1].start() if i + 1 < len(h2_matches) else len(text)
+    for i, match in enumerate(heading_matches):
+        hashes = match.group(1)
+        heading = match.group(2).strip()
+        end = (
+            heading_matches[i + 1].start()
+            if i + 1 < len(heading_matches)
+            else len(text)
+        )
         body = text[match.end() : end].strip()
         sections.append(
             Section(
@@ -94,7 +100,7 @@ def parse_manual_file(path: Path) -> list[Section]:
                 page_title,
                 heading,
                 anchor_from_heading(heading),
-                f"## {heading}\n\n{body}",
+                f"{hashes} {heading}\n\n{body}",
             )
         )
 

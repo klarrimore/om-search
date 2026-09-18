@@ -21,49 +21,35 @@
 
   // >>> om-search (managed by plugin/install.sh — do not edit inside markers) >>>
   "manual": {
-    "icon": "",
+    "icon": "󰧑",
     "label": "Manual",
     "description": "Search the Omarchy manual and CLI commands (om-search)",
     "aliases": ["om-search", "docs", "help", "search manual"],
     "when": "command -v om-search >/dev/null"
   },
   "manual.search": {
-    "icon": "",
-    "label": "Search Everything",
+    "icon": "",
+    "label": "Search",
     "description": "Fuzzy-search manual sections and commands together",
-    "action": "omarchy-launch-tui om-search",
-    "when": "command -v om-search >/dev/null"
-  },
-  "manual.docs": {
-    "icon": "",
-    "label": "Search Docs",
-    "description": "Search the manual documentation only",
-    "action": "omarchy-launch-tui om-search --docs",
-    "when": "command -v om-search >/dev/null"
-  },
-  "manual.cmds": {
-    "icon": "",
-    "label": "Search Commands",
-    "description": "Search the omarchy CLI command tree only",
-    "action": "omarchy-launch-tui om-search --cmds",
+    "action": "omarchy-launch-or-focus-tui --app-id=org.omarchy.om-search-all om-search",
     "when": "command -v om-search >/dev/null"
   },
   "manual.pages": {
-    "icon": "",
+    "icon": "",
     "label": "Browse Pages",
     "description": "Pick a manual page, then search within it",
-    "action": "omarchy-launch-tui om-search --pages",
+    "action": "omarchy-launch-or-focus-tui --app-id=org.omarchy.om-search-pages om-search --pages",
     "when": "command -v om-search >/dev/null"
   },
   "manual.groups": {
-    "icon": "",
+    "icon": "",
     "label": "Browse Command Groups",
     "description": "Pick a command group, then search within it",
-    "action": "omarchy-launch-tui om-search --groups",
+    "action": "omarchy-launch-or-focus-tui --app-id=org.omarchy.om-search-groups om-search --groups",
     "when": "command -v om-search >/dev/null"
   },
   "manual.update": {
-    "icon": "",
+    "icon": "",
     "label": "Update Manual",
     "description": "Pull the latest manual and re-index commands",
     "action": "omarchy-launch-floating-terminal-with-presentation om-search --update",

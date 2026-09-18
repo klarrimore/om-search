@@ -96,3 +96,47 @@ class TestParseManualFile:
         sections = parse_manual_file(f)
         screenshots = [s for s in sections if s.heading == "Screenshots"][0]
         assert screenshots.anchor == "screenshots"
+
+
+class TestH3Sections:
+    """The live Omarchy manual uses H3 for subsections; nearly half the pages
+    have no H2 at all, so H3 must also open a section (regression)."""
+
+    def _write(self, tmp_path, body):
+        f = tmp_path / "14-h3-page.md"
+        f.write_text(body, encoding="utf-8")
+        return f
+
+    def test_h3_only_page_splits_into_subsections(self, tmp_path):
+        f = self._write(
+            tmp_path,
+            "# Navigation\n\nIntro blurb.\n\n"
+            "### Dwindle vs scrolling layout\n\nDwindle body.\n\n"
+            "### Grouping windows\n\nGrouping body.\n",
+        )
+        sections = parse_manual_file(f)
+        headings = [s.heading for s in sections]
+        assert headings == ["", "Dwindle vs scrolling layout", "Grouping windows"]
+        assert len(sections) == 3  # intro + 2 subsections, not one blob
+
+    def test_h3_section_has_anchor_and_body(self, tmp_path):
+        f = self._write(
+            tmp_path,
+            "# Navigation\n\n### Grouping windows\n\nUse Super+Tab to group.\n",
+        )
+        grouping = [s for s in parse_manual_file(f) if s.heading == "Grouping windows"][0]
+        assert grouping.anchor == "grouping-windows"
+        assert "Super+Tab" in grouping.text
+
+    def test_h3_text_preserves_heading_level(self, tmp_path):
+        f = self._write(tmp_path, "# T\n\n### Sub\n\nbody\n")
+        sub = [s for s in parse_manual_file(f) if s.heading == "Sub"][0]
+        assert sub.text.startswith("### Sub")
+
+    def test_mixed_h2_and_h3_both_open_sections(self, tmp_path):
+        f = self._write(
+            tmp_path,
+            "# T\n\n## Top\n\ntop body\n\n### Nested\n\nnested body\n\n## Other\n\nother\n",
+        )
+        headings = [s.heading for s in parse_manual_file(f) if s.heading]
+        assert headings == ["Top", "Nested", "Other"]

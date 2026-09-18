@@ -43,7 +43,8 @@ class TestPickerHeader:
     def test_all_mode(self):
         h = picker_header(mode="all")
         assert "all sources" in h
-        assert "Enter: open" in h
+        assert "Enter: read" in h
+        assert "Ctrl+O: full page" in h
 
     def test_doc_mode(self):
         h = picker_header(mode="doc")
@@ -143,6 +144,64 @@ class TestRunFzf:
         assert any(b.startswith("?:change-preview") for b in binds)
         assert any(b.startswith("ctrl-y:") for b in binds)
 
+    def test_no_expect_left_when_back_disabled(self, monkeypatch):
+        cmd = self._capture(monkeypatch)
+        assert "--expect" not in cmd
+
+    def test_enter_opens_reading_mode_for_docs(self, monkeypatch):
+        cmd = self._capture(monkeypatch)
+        binds = [cmd[i + 1] for i, a in enumerate(cmd) if a == "--bind"]
+        enter = [b for b in binds if b.startswith("enter:")]
+        assert enter, "enter must be bound"
+        assert "doc" in enter[0]                    # doc -> reading mode
+        assert "change-preview-window" in enter[0]  # enlarge the pane
+        assert "accept" in enter[0]                 # command -> accept
+
+    def test_ctrl_o_opens_full_pager_for_docs(self, monkeypatch):
+        cmd = self._capture(monkeypatch)
+        binds = [cmd[i + 1] for i, a in enumerate(cmd) if a == "--bind"]
+        assert any(b.startswith("ctrl-o:") and "om-search open" in b for b in binds)
+
+    def test_movement_is_modal_while_reading(self, monkeypatch):
+        cmd = self._capture(monkeypatch)
+        binds = [cmd[i + 1] for i, a in enumerate(cmd) if a == "--bind"]
+        cj = [b for b in binds if b.startswith("ctrl-j:transform")]
+        assert cj, "ctrl-j must be modal"
+        assert "preview-down" in cj[0] and "reading" in cj[0]
+
+
+class TestRunFzfBack:
+    """Scoped pickers let Left/Esc pop back to the parent list."""
+
+    @staticmethod
+    def _run(monkeypatch, stdout, returncode=0):
+        captured = {}
+
+        def fake_run(cmd, **_):
+            captured["cmd"] = cmd
+            return types.SimpleNamespace(stdout=stdout, returncode=returncode)
+
+        monkeypatch.setattr("om_search.picker.subprocess.run", fake_run)
+        cfg = Config(theme_source="none")
+        result = run_fzf(["d\ta.md\tanc\t[doc] T\tbody"], cfg=cfg, back=True)
+        return captured["cmd"], result
+
+    def test_binds_left_via_expect(self, monkeypatch):
+        cmd, _ = self._run(monkeypatch, "\nsel")
+        assert cmd[cmd.index("--expect") + 1] == "left"
+
+    def test_left_key_returns_back_sentinel(self, monkeypatch):
+        _, result = self._run(monkeypatch, "left\n[doc] T")
+        assert result is picker.BACK
+
+    def test_esc_returns_back_sentinel(self, monkeypatch):
+        _, result = self._run(monkeypatch, "", returncode=130)
+        assert result is picker.BACK
+
+    def test_enter_still_returns_selection(self, monkeypatch):
+        _, result = self._run(monkeypatch, "\n[doc]\tT\tanchor")
+        assert result == "[doc]\tT\tanchor"
+
 
 class TestAction:
     def test_action_returns_view_and_text_for_doc(self):
@@ -190,3 +249,145 @@ class TestRenderMarkdown:
         monkeypatch.setattr(picker.sys.stdout, "isatty", lambda: False)
         picker.view_markdown("plain body")
         assert "plain body" in capsys.readouterr().out
+
+
+class TestRunSimpleFzf:
+    @staticmethod
+    def _capture(monkeypatch, stdout="", **kwargs):
+        captured = {}
+
+        def fake_run(cmd, **_):
+            captured["cmd"] = cmd
+            return types.SimpleNamespace(stdout=stdout)
+
+        monkeypatch.setattr("om_search.picker.subprocess.run", fake_run)
+        cfg = Config(theme_source="none")
+        result = picker.run_simple_fzf(
+            ["omarchy theme", "omarchy capture"], cfg=cfg, **kwargs
+        )
+        return captured["cmd"], result
+
+    def test_returns_none_on_cancel(self, monkeypatch):
+        _, result = self._capture(monkeypatch, stdout="")
+        assert result is None
+
+    def test_returns_selected_line(self, monkeypatch):
+        _, result = self._capture(monkeypatch, stdout="omarchy capture\n")
+        assert result == "omarchy capture"
+
+    def test_is_themed_and_bordered(self, monkeypatch):
+        cmd, _ = self._capture(monkeypatch)
+        assert cmd[0] == "fzf"
+        assert "--border=rounded" in cmd
+
+    def test_forwards_header_and_query(self, monkeypatch):
+        cmd, _ = self._capture(monkeypatch, header="Pick one", query="cap")
+        assert cmd[cmd.index("--header") + 1] == "Pick one"
+        assert cmd[cmd.index("--query") + 1] == "cap"
+
+
+class TestKeysCheatsheet:
+    def test_lists_configured_chords(self):
+        sheet = picker.keys_cheatsheet(Config())
+        assert "Ctrl + J" in sheet
+        assert "Ctrl + K" in sheet
+
+
+class TestViewMarkdownPager:
+    def test_pages_through_less_when_tty(self, monkeypatch):
+        monkeypatch.setattr(picker.shutil, "which",
+                            lambda n: "/usr/bin/less" if n == "less" else None)
+        monkeypatch.setattr(picker.sys.stdout, "isatty", lambda: True)
+        calls = {}
+        monkeypatch.setattr(
+            picker.subprocess, "run",
+            lambda cmd, **k: calls.update(cmd=cmd, input=k.get("input")),
+        )
+        picker.view_markdown("# body")
+        assert calls["cmd"][0] == "less"
+
+
+class TestPageText:
+    def test_returns_whole_page_not_just_section(self):
+        cand = DocCandidate(
+            page_file=FIXTURE_FILE, anchor="workspaces",
+            page_title="Navigation", heading="Workspaces",
+        )
+        text = picker.page_text(cand)
+        # Whole page: both the intro and every section are present.
+        assert "Omarchy intro" in text
+        assert "Super + Space" in text
+        assert "switch between workspaces" in text
+
+    def test_empty_when_file_missing(self):
+        cand = DocCandidate(
+            page_file="nope.md", anchor="", page_title="", heading="",
+        )
+        assert picker.page_text(cand) == ""
+
+
+class TestHeadingLine:
+    def test_finds_heading_line_ignoring_ansi(self):
+        rendered = "intro line\n\x1b[1m## \x1b[0m\x1b[1mWorkspaces\x1b[0m\nbody\n"
+        assert picker.heading_line(rendered, "Workspaces") == 2
+
+    def test_prefers_hashed_heading_over_body_mention(self):
+        rendered = "we discuss Workspaces here\n### Workspaces\nbody\n"
+        assert picker.heading_line(rendered, "Workspaces") == 2
+
+    def test_returns_zero_when_absent(self):
+        assert picker.heading_line("nothing here\n", "Missing") == 0
+
+    def test_returns_zero_for_empty_heading(self):
+        assert picker.heading_line("## X\n", "") == 0
+
+
+class TestViewMarkdownJump:
+    def test_opens_pager_at_heading_line(self, monkeypatch):
+        monkeypatch.setattr(picker.shutil, "which",
+                            lambda n: "/usr/bin/less" if n == "less" else None)
+        monkeypatch.setattr(picker.sys.stdout, "isatty", lambda: True)
+        # no markdown renderer -> rendered text is the raw input, lines intact
+        monkeypatch.setattr(picker, "render_markdown", lambda t: t)
+        calls = {}
+        monkeypatch.setattr(
+            picker.subprocess, "run",
+            lambda cmd, **k: calls.update(cmd=cmd),
+        )
+        picker.view_markdown("# Title\n\n## First\n\na\n\n## Second\n\nb\n",
+                             jump_to="Second")
+        assert calls["cmd"][0] == "less"
+        assert "+7" in calls["cmd"]  # positioned at the "## Second" line
+
+    def test_no_jump_arg_when_heading_absent(self, monkeypatch):
+        monkeypatch.setattr(picker.shutil, "which",
+                            lambda n: "/usr/bin/less" if n == "less" else None)
+        monkeypatch.setattr(picker.sys.stdout, "isatty", lambda: True)
+        monkeypatch.setattr(picker, "render_markdown", lambda t: t)
+        calls = {}
+        monkeypatch.setattr(
+            picker.subprocess, "run", lambda cmd, **k: calls.update(cmd=cmd),
+        )
+        picker.view_markdown("just text\n", jump_to="Nope")
+        assert not any(a.startswith("+") for a in calls["cmd"])  # no jump arg
+        assert calls["cmd"][:2] == ["less", "-R"]
+
+    def test_esc_binds_to_back_via_lesskey(self, monkeypatch):
+        """Esc must act as 'back': less is launched with a LESSKEYIN file that
+        binds Esc to quit, so the picker loop resumes."""
+        monkeypatch.setattr(picker.shutil, "which",
+                            lambda n: "/usr/bin/less" if n == "less" else None)
+        monkeypatch.setattr(picker.sys.stdout, "isatty", lambda: True)
+        monkeypatch.setattr(picker, "render_markdown", lambda t: t)
+        calls = {}
+        monkeypatch.setattr(
+            picker.subprocess, "run",
+            lambda cmd, **k: calls.update(cmd=cmd, env=k.get("env")),
+        )
+        picker.view_markdown("body\n")
+        env = calls["env"]
+        assert env is not None and "LESSKEYIN" in env
+        from pathlib import Path
+        assert "quit" in Path(env["LESSKEYIN"]).read_text(encoding="utf-8")
+        # prompt advertises the back key
+        assert any("back" in a for a in calls["cmd"])

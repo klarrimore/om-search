@@ -3,19 +3,26 @@
 Adds a **Manual** submenu to the Quickshell Omarchy menu (`Super+Space`) that
 launches [`om-search`](../README.md) in its various modes:
 
-| Row                     | Runs                                                       |
-| ----------------------- | ---------------------------------------------------------- |
-| Search Everything       | `om-search`                                                |
-| Search Docs             | `om-search --docs`                                         |
-| Search Commands         | `om-search --cmds`                                         |
-| Browse Pages            | `om-search --pages`                                        |
-| Browse Command Groups   | `om-search --groups`                                       |
-| Update Manual           | `om-search --update` (in a floating presentation terminal) |
+| Row                   | Runs                                                       |
+| --------------------- | ---------------------------------------------------------- |
+| Search                | `om-search` (docs + commands, interleaved)                 |
+| Browse Pages          | `om-search --pages`                                        |
+| Browse Command Groups | `om-search --groups`                                       |
+| Update Manual         | `om-search --update` (in a floating presentation terminal) |
 
-Interactive pickers open with `omarchy-launch-tui`; the non-interactive update
-runs in a floating terminal with the Omarchy presentation wrapper. Every row is
-gated on `command -v om-search`, so the submenu stays hidden on machines where
-om-search is not installed.
+Each row carries a nerd-font icon (book, search, file, terminal, refresh) that
+matches Omarchy's own menu. The interactive pickers open with
+`omarchy-launch-or-focus-tui`, each under its own `--app-id`
+(`org.omarchy.om-search-{all,pages,groups}`), so re-selecting a row **focuses the
+existing window** instead of stacking new terminals; the distinct ids keep the
+three modes from stealing each other's focus. The non-interactive update runs in
+a floating terminal with the Omarchy presentation wrapper. Every row is gated on
+`command -v om-search`, so the submenu stays hidden on machines where om-search
+is not installed.
+
+Scoped fuzzy search (`--docs` / `--cmds`) is intentionally left off the menu —
+the top-level **Search** already interleaves both, and the flags remain
+available from the CLI.
 
 ## Why a menu entry (and not a bar widget)
 
