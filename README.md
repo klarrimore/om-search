@@ -6,9 +6,11 @@ Search the [Omarchy Linux](https://github.com/basecamp/omarchy) manual and CLI c
 
 - Bundles the Omarchy manual for offline search
 - Pulls the live `omarchy` CLI command tree on systems where it is installed
-- Opens an interactive fzf picker: type to fuzzy-match across manual sections and commands together
-- Fuzzy-matches against page titles and section headings in the picker display
-- Doc results are rendered as markdown (`glow`, falling back to `mdcat` or `bat`) and opened in an interactive pager (`less`)
+- Opens one hierarchical fzf session: Home, search, manual-page, command-group,
+  section, reader, and cross-reference routes all share the same selector
+- Fuzzy-matches page titles, section headings, command descriptions, and body
+  excerpts in every list route
+- Docs focus in the preview reader; `Ctrl-O` remains the full-page pager escape
 - Command results print to stdout; `Ctrl-Y` copies the command to the clipboard (Wayland)
 
 ## Install
@@ -71,16 +73,15 @@ the ranked results are printed as plain text automatically, the same as `--print
 On machines without the `omarchy` CLI (non-Omarchy distros), the command
 surface is disabled and doc search still works -- degraded mode.
 
-## Navigation model
+`om-search` starts at a Home route with `Search all`, `Manual pages`, and
+`Command groups` when the live command tree is available. `Enter` or `Right`
+descends into a route; `Left` or `Escape` backs out. Selecting a document
+focuses its preview as a reader without leaving the current result list.
 
-`om-search` follows the Omarchy CLI style: common operations at the top
-level, specialised scoping via flags.  The default picker shows all
-documentation sections and CLI commands interleaved.  Use `--docs` or
-`--cmds` to focus one source, or drill into a specific page or group
-with `--page` or `--group`.
-
-The `--pages` and `--groups` flags open a page/group browser (also fzf).
-Picking a result launches a picker scoped to that page or group.
+`--docs` and `--cmds` enter source-filtered search routes. `--pages` and
+`--groups` enter their browsing routes, while `--page` and `--group` enter a
+specific scoped route. Cross-references opened with `Ctrl-L` use the same fzf
+session and return to their link list before the originating route.
 
 ## Appearance and keybindings
 
@@ -89,22 +90,24 @@ track the **active Omarchy theme** (read from the theme's `colors.toml`, so it
 re-themes when you switch themes), with vim-style navigation and a `?` help
 overlay.
 
-Default keys (all configurable):
-
 | Key | Action |
 | --- | --- |
-| `Ctrl-J` / `Ctrl-K` | move down / up |
-| `Ctrl-D` / `Ctrl-U` | half page down / up |
-| `Ctrl-F` / `Ctrl-B` | scroll the preview |
-| `Enter` | read a doc in the right pane (reading mode) / run a command |
-| `Ctrl-O` | open the current doc full-screen in the pager |
-| `Ctrl-L` | follow a cross-reference link to another page |
-| `Ctrl-Y` | copy a command to the clipboard |
-| `?` | show the keybindings (in the preview pane) |
-| `Esc` | back one level / quit |
+| `Up` / `Down` | select in lists / move between lines in the reader |
+| `PageUp` / `PageDown` | page lists / page the reader cursor |
+| `Left` / `Right` | back in lists / move by character in the reader |
+| `Alt-Left` / `Alt-Right` | move by word in the reader |
+| `Ctrl-]` | toggle word and character cursor modes |
+| `Enter` | descend, focus a document, or accept a command |
+| `Tab` | focus / unfocus the reader |
+| `Escape` | back one route; Escape quits at Home |
+| `Ctrl-J` / `Ctrl-K` | additional configured move down / up |
+| `Ctrl-D` / `Ctrl-U` | additional configured half-page cursor movement |
+| `Ctrl-L` | follow cross-reference links |
+| `Ctrl-Y` | copy and accept a command |
+| `?` | show the keybindings in the preview |
 
-Plain letters still go to the fuzzy query — a fuzzy finder can't use bare
-`j`/`k` for movement, so the vim navigation is on `Ctrl` chords.
+Plain letters remain fuzzy-search input. Configure the additional Ctrl chords
+in `~/.config/om-search/config.toml`.
 
 Configure theme and keys in `~/.config/om-search/config.toml` (herdr-style
 `[theme]` and `[keys]` tables):

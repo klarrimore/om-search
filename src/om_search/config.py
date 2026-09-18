@@ -11,10 +11,10 @@ from pathlib import Path
 
 from om_search.paths import config_path
 
-# Action -> default fzf key. Only Ctrl-chords, Enter, and "?" are bound so that
-# plain letters keep flowing into the fuzzy query (a fuzzy finder cannot use
-# bare j/k for movement — those are search input). This mirrors herdr's vim
-# navigation as closely as an fzf picker allows.
+# Action -> additional configurable key. Up/Down, PageUp/PageDown,
+# Enter/Right, and Left/Escape are always available as selector keys; these
+# Ctrl chords supplement them without consuming fuzzy-search letters.
+# This mirrors OMP/Pi selector conventions while retaining typed search.
 DEFAULT_KEYS: dict[str, str] = {
     "down": "ctrl-j",
     "up": "ctrl-k",
@@ -105,20 +105,23 @@ CONFIG_TEMPLATE = """\
 # accent = "#f5c2e7"
 # background = "#11111b"
 
+# Built-in selector keys (not configurable):
+#   Up/Down move between lines, PageUp/PageDown page the reader,
+#   Left/Right move by character, Alt-Left/Alt-Right move by word,
+#   Ctrl-] toggles cursor mode, Enter/Tab focus the reader,
+#   Escape backs (Escape quits at Home), Ctrl-C aborts.
+# The entries below add configurable Ctrl-chords; plain typing remains query
+# input. Set a value to "" to unbind an additional action.
 [keys]
-# fzf key names. Ctrl-chords keep plain typing free for the search query.
-# Set a value to "" to unbind it. "open" is always Enter.
-# down = "ctrl-j"
-# up = "ctrl-k"
-# half_page_down = "ctrl-d"
-# half_page_up = "ctrl-u"
-# preview_down = "ctrl-f"
-# preview_up = "ctrl-b"
-# copy = "ctrl-y"
-# help = "?"
+down = "ctrl-j"
+up = "ctrl-k"
+half_page_down = "ctrl-d"
+half_page_up = "ctrl-u"
+preview_down = "ctrl-f"
+preview_up = "ctrl-b"
+copy = "ctrl-y"
+help = "?"
 """
-
-
 def write_default_config(path: Path | None = None) -> Path:
     """Write the commented default config if it does not already exist."""
     p = path or config_path()

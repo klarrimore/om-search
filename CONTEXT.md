@@ -28,15 +28,14 @@ The mechanism that refreshes the bundled manual after the Omarchy system updates
 _Avoid_: refresh, sync job
 
 **Fuzzy picker**:
-The interactive result selector (fzf) that `om-search` always opens. When invoked without arguments, starts empty. When invoked with a query (`om-search screenshot`), pre-populates the search prompt. Ships with Omarchy, so a zero-install dependency for the target audience.
+The single hierarchical fzf session that powers `om-search`: Home, search,
+manual-page, command-group, section, reader, and link routes share one
+selector. Enter/Right descends or focuses the preview; Left/Escape backs out.
 
 **Doc section (selected result)**:
-A manual section chosen from the fuzzy picker. Displayed through a markdown viewer / `less`.
-_Avoid_: open in browser, open in editor
-
-**Command (selected result)**:
-An `omarchy` CLI command chosen from the fuzzy picker. Printed to stdout. The user can also copy it to the clipboard via a keybinding.
-_Avoid_: execute directly, shell out
+A manual section selected in a list route. It is displayed in the fzf preview
+reader without leaving the current result list; `Ctrl-O` remains the full-page
+pager escape hatch.
 
 ## Architecture
 

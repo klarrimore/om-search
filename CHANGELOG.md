@@ -8,7 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Follow cross-reference links: pressing `Ctrl-L` on a doc opens a picker of that page's manual links; selecting one jumps to the linked page (pre-filtered to the linked section when the link has an anchor), and backing out returns to the link list. Since fzf's preview pane can't hold a cursor, the links are presented as a selectable sub-list.
+- Added granular document reader cursors with independent per-document state,
+  including character movement, word movement, page movement, and cursor-mode
+  toggling within the single fzf session
+- Added Ctrl-L cross-reference navigation from the document reader, with linked
+  section selection and return navigation
+
+### Changed
+- Replaced nested pickers and pager loops with one hierarchical fzf session across home, search, manual-page, command-group, reader, and link routes
 
 ## [0.4.0] - 2026-09-19
 

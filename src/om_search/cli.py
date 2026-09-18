@@ -1,49 +1,64 @@
-"""om-search CLI — entry point and orchestration."""
+"""om-search CLI entry point and hierarchical navigation orchestration."""
+
+from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from om_search.commands import Command, list_groups, parse_commands_json
+from om_search.commands import Command, parse_commands_json
+from om_search.config import load_config, write_default_config
 from om_search.index import (
     INDEX_FILENAME,
-    DocCandidate,
     build_candidates,
     build_index,
     display_label,
     load_index,
-    parse_fzf_line,
-    preview_key,
-    render_candidate,
 )
-from om_search.manual import Section, extract_links, list_pages, parse_manual_file
-from om_search.paths import data_dir, manual_dir, preview_dir, repo_dir
-from om_search.config import write_default_config
+from om_search.manual import Section, list_pages, parse_manual_file
+from om_search.paths import data_dir, manual_dir, repo_dir
 from om_search.picker import (
-    BACK,
-    action_for,
+    build_navigation_dataset,
     keys_cheatsheet,
-    page_text,
+    navigation_full_text,
+    navigation_preview,
+    navigation_reader_move,
+    navigation_reader_preview,
+    navigation_row,
+    navigation_rows,
+    navigation_transition_action,
     run_fzf,
-    run_simple_fzf,
     view_markdown,
 )
 from om_search.theme import color_enabled
 from om_search.update import ensure_manual, update_manual
 
-# cmd_picker returns this to its caller (cmd_pages/cmd_groups) when the user
-# asked to pop back to the parent list rather than exit.
-GO_BACK = -1
 
 
+def _render_text(text: str) -> None:
+    """Render preview text with the available markdown renderer."""
+    if not color_enabled():
+        print(text)
+        return
+    if shutil.which("mdcat"):
+        result = subprocess.run(["mdcat", "--ansi", "-"], input=text, capture_output=True, text=True)
+        print(result.stdout, end="")
+        return
+    if shutil.which("bat"):
+        result = subprocess.run(
+            ["bat", "--language=md", "--paging=never", "--wrap=character",
+             "--decorations=never", "--color=always", "-"],
+            input=text, capture_output=True, text=True,
+        )
+        print(result.stdout, end="")
+        return
+    print(text)
 def find_commands() -> list[Command]:
-    """Capture the command tree from the installed omarchy CLI.
-
-    Returns an empty list when the CLI is not available (degraded mode).
-    """
+    """Capture the live command tree, returning [] in degraded mode."""
     try:
         result = subprocess.run(
             ["omarchy", "commands", "--json"],
@@ -57,9 +72,8 @@ def find_commands() -> list[Command]:
 
 
 def _ensure_manual() -> Path:
-    """Ensure the manual is cloned and return its path.  Exits on failure."""
-    repo = repo_dir()
-    ensure_manual(repo)
+    """Ensure the manual exists and return its directory."""
+    ensure_manual(repo_dir())
     mdir = manual_dir()
     if not mdir.exists():
         print("Manual not found. Run `om-search update` first.", file=sys.stderr)
@@ -67,195 +81,221 @@ def _ensure_manual() -> Path:
     return mdir
 
 
-def _load_sections(mdir: Path) -> list[Section]:
-    """Load sections from the pre-built index, or parse from disk."""
-    index_path = data_dir() / INDEX_FILENAME
-    index_data = load_index(index_path)
+def _load_content(mdir: Path) -> tuple[list[Section], dict[str, str]]:
+    index_data = load_index(data_dir() / INDEX_FILENAME)
     if index_data is not None:
-        return index_data[0]
-    # Fallback: parse every markdown file
-    result: list[Section] = []
-    for f in sorted(mdir.glob("*.md")):
-        result.extend(parse_manual_file(f))
-    return result
+        return index_data
+    sections: list[Section] = []
+    page_texts: dict[str, str] = {}
+    for path in sorted(mdir.glob("*.md")):
+        parsed = parse_manual_file(path)
+        sections.extend(parsed)
+        page_texts[path.name] = path.read_text(encoding="utf-8")
+    return sections, page_texts
+
+
+def _load_sections(mdir: Path) -> list[Section]:
+    """Compatibility wrapper used by update and external callers."""
+    return _load_content(mdir)[0]
 
 
 def cmd_update() -> int:
-    """Update the manual repository, rebuild index, and re-cache commands."""
-    ok = update_manual(repo_dir())
-    if ok:
-        print("Manual updated.")
-    else:
+    """Update the manual, rebuild its index, and report command availability."""
+    if not update_manual(repo_dir()):
         print("Update failed.", file=sys.stderr)
         return 1
-
-    # Rebuild the pre-built index
+    print("Manual updated.")
     mdir = manual_dir()
     if mdir.exists():
         build_index(mdir, data_dir() / INDEX_FILENAME)
         print("Search index rebuilt.")
-        sections = _load_sections(mdir)
-        print(f"{len(sections)} doc sections indexed.")
+        print(f"{len(_load_sections(mdir))} doc sections indexed.")
     else:
         print("No manual directory found; index not built.", file=sys.stderr)
-
-    cmds = find_commands()
-    if cmds:
-        print(f"{len(cmds)} commands indexed.")
+    commands = find_commands()
+    if commands:
+        print(f"{len(commands)} commands indexed.")
     else:
         print("Command tree not available (degraded mode).")
     return 0
 
 
-def cmd_open(page_file: str, anchor: str = "") -> int:
-    """Open a full manual page in the pager, positioned at a section.
-
-    Internal command invoked by the picker's Ctrl-O binding. Resolves the
-    heading for ``anchor`` so :func:`view_markdown` can jump to it.
-    """
-    heading = ""
-    index_data = load_index(data_dir() / INDEX_FILENAME)
-    sections = index_data[0] if index_data is not None else _load_sections(manual_dir())
-    for s in sections:
-        if s.page_file == page_file and s.anchor == anchor:
-            heading = s.heading
-            break
-    cand = DocCandidate(
-        page_file=page_file, anchor=anchor, page_title="", heading=heading
-    )
-    view_markdown(page_text(cand), jump_to=heading or None)
-    return 0
-
-
-def cmd_links(page_file: str) -> int:
-    """Pick a cross-reference link on ``page_file`` and jump to that page.
-
-    Internal command invoked by the picker's Ctrl-L binding. Lists the page's
-    manual links; selecting one opens that page's scoped doc picker (pre-filtered
-    to the linked section when the link carries an anchor). Backing out of the
-    target returns to the link list.
-    """
-    links = extract_links(page_text(DocCandidate(page_file=page_file)))
-    if not links:
-        print("No links on this page.", file=sys.stderr)
-        return 0
-
-    items: list[str] = []
-    seen: set[tuple[str, str]] = set()
-    for label, page, anchor in links:
-        if (page, anchor) in seen:
-            continue
-        seen.add((page, anchor))
-        target = f"{page}#{anchor}" if anchor else page
-        items.append(f"{label}  →  {target}")
-
-    header = "Follow a link  |  Enter: go  |  Esc: back"
-    while True:
-        selected = run_simple_fzf(items, header=header)
-        if selected is None:
-            return 0
-        target = selected.rsplit("→", 1)[-1].strip()
-        page, _, anchor = target.partition("#")
-        query = anchor.replace("-", " ") if anchor else ""
-        result = cmd_picker(mode="doc", page_filter=page, query=query)
-        if result != GO_BACK:
-            return result
-        # else: user backed out of the target page — reshow the link list
-
-
 def cmd_preview(key1: str, key2: str = "") -> int:
-    """Render preview content for the fzf preview window (internal command).
-
-    Reads from the pre-built index for speed.  Falls back to parsing
-    the markdown file from disk when the index is unavailable.
-
-    key1 is the page file name (for doc) or command path (for cmd).
-    key2 is the anchor (for doc) or description (for cmd).
-    """
-    # Fast path: a pre-rendered per-entry preview file (avoids parsing the
-    # whole index on every selection). Only docs/pages have these.
-    pfile = preview_dir() / preview_key(key1, key2)
-    if pfile.is_file():
-        try:
-            _render_text(pfile.read_text(encoding="utf-8"))
-            return 0
-        except OSError:
-            pass  # fall through to the index on any read error
-
-    # Fall back to the pre-built index.
-    index_path = data_dir() / INDEX_FILENAME
-    index_data = load_index(index_path)
-    if index_data is not None:
-        sections, page_texts = index_data
-        text: str | None = None
-        if key2:
-            matching = [s for s in sections if s.page_file == key1 and s.anchor == key2]
-            text = matching[0].text if matching else None
-        if text is None:
-            text = page_texts.get(key1)
-        if text:
-            _render_text(text)
-            return 0
-
-    # Fallback: read from disk
-    import os
-
-    resolved = key1
-    if not os.path.isabs(key1) and not key1.startswith("omarchy"):
-        resolved = str(manual_dir() / key1)
-
-    is_file = os.path.isfile(resolved)
-    if is_file:
-        sections = parse_manual_file(Path(resolved))
-        if key2:
-            matching = [s for s in sections if s.anchor == key2]
-            if matching:
-                text = matching[0].text
-            else:
-                text = Path(resolved).read_text(encoding="utf-8")
-        else:
-            text = Path(resolved).read_text(encoding="utf-8")
-
-        _render_text(text)
-    else:
+    """Legacy preview endpoint retained for callers outside the new picker."""
+    if key1.startswith("omarchy"):
         print(key1)
         if key2:
             print()
             print(key2)
+        return 0
+    index_data = load_index(data_dir() / INDEX_FILENAME)
+    if index_data is not None:
+        sections, page_texts = index_data
+        if key2:
+            match = next((s for s in sections if s.page_file == key1 and s.anchor == key2), None)
+            if match is not None:
+                _render_text(match.text)
+                return 0
+        if key1 in page_texts:
+            _render_text(page_texts[key1])
+            return 0
+    path = manual_dir() / key1
+    if path.is_file():
+        if key2:
+            match = next((s for s in parse_manual_file(path) if s.anchor == key2), None)
+            _render_text(match.text if match else path.read_text(encoding="utf-8"))
+        else:
+            _render_text(path.read_text(encoding="utf-8"))
+    else:
+        print(key1)
     return 0
 
 
-def _render_text(text: str) -> None:
-    """Render markdown text to the terminal with color and formatting.
+def cmd_nav_data(dataset: str, route_id: str) -> int:
+    try:
+        sys.stdout.write(navigation_rows(Path(dataset), route_id))
+    except (OSError, ValueError) as exc:
+        print(f"Invalid navigation dataset: {exc}", file=sys.stderr)
+        return 1
+    return 0
 
-    Tries mdcat (true markdown rendering), then bat (syntax-highlighted
-    markdown source), then falls back to plain text. Emits no ANSI when
-    colour is disabled (NO_COLOR / TERM=dumb).
-    """
-    if not color_enabled():
-        print(text)
-        return
-    if shutil.which("mdcat"):
-        result = subprocess.run(
-            ["mdcat", "--ansi", "-"],
-            input=text,
-            capture_output=True,
-            text=True,
+
+def cmd_nav_preview(dataset: str, preview_id: str) -> int:
+    try:
+        text = navigation_preview(Path(dataset), preview_id)
+    except (OSError, ValueError) as exc:
+        print(f"Invalid navigation dataset: {exc}", file=sys.stderr)
+        return 1
+    _render_text(text)
+    return 0
+
+
+def _reader_viewport(value: str) -> int:
+    if not re.fullmatch(r"[0-9]+", value) or int(value) <= 0:
+        raise ValueError("viewport must be a positive decimal")
+    return int(value)
+
+
+def cmd_nav_reader_preview(
+    dataset: str, preview_id: str, viewport_lines: str = "24"
+) -> int:
+    try:
+        viewport = _reader_viewport(viewport_lines)
+        text = navigation_reader_preview(Path(dataset), preview_id, viewport)
+    except (OSError, ValueError) as exc:
+        print(f"Invalid navigation reader: {exc}", file=sys.stderr)
+        return 1
+    sys.stdout.write(text)
+    return 0
+
+
+def cmd_nav_reader_move(
+    dataset: str,
+    preview_id: str,
+    movement: str,
+    viewport_lines: str = "24",
+) -> int:
+    try:
+        viewport = _reader_viewport(viewport_lines)
+        navigation_reader_move(Path(dataset), preview_id, movement, viewport)
+    except (OSError, ValueError) as exc:
+        print(f"Invalid navigation reader: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def cmd_nav_open(dataset: str, row_id: str) -> int:
+    try:
+        text, heading = navigation_full_text(Path(dataset), row_id)
+    except (OSError, ValueError) as exc:
+        print(f"Invalid navigation row: {exc}", file=sys.stderr)
+        return 1
+    view_markdown(text, jump_to=heading or None)
+    return 0
+
+
+def cmd_nav_copy(dataset: str, row_id: str) -> int:
+    try:
+        row = navigation_row(Path(dataset), row_id, kinds={"cmd"})
+    except (OSError, ValueError) as exc:
+        print(f"Invalid navigation row: {exc}", file=sys.stderr)
+        return 1
+    payload = row.get("payload")
+    if not isinstance(payload, str):
+        return 1
+    try:
+        subprocess.run(["wl-copy"], input=payload, text=True, check=False)
+    except OSError as exc:
+        print(f"Unable to copy command: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def cmd_nav_transition(dataset: str, route_id: str, args: list[str]) -> int:
+    enter_kind = ""
+    focus_kind = ""
+    parent_route_id = "0"
+    row_id = ""
+    links = False
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token == "--enter" and i + 2 < len(args):
+            enter_kind = args[i + 1]
+            parent_route_id = args[i + 2]
+            i += 3
+        elif token == "--focus" and i + 2 < len(args):
+            focus_kind = args[i + 1]
+            parent_route_id = args[i + 2]
+            i += 3
+        elif token == "--row" and i + 1 < len(args):
+            row_id = args[i + 1]
+            i += 2
+        elif token == "--links":
+            links = True
+            i += 1
+        else:
+            i += 1
+    try:
+        action = navigation_transition_action(
+            Path(dataset),
+            route_id,
+            enter_kind=enter_kind,
+            focus_kind=focus_kind,
+            parent_route_id=parent_route_id,
+            row_id=row_id,
+            links=links,
         )
-        print(result.stdout, end="")
-        return
+    except (OSError, ValueError) as exc:
+        print(f"Invalid navigation transition: {exc}", file=sys.stderr)
+        return 1
+    print(action)
+    return 0
 
-    if shutil.which("bat"):
-        result = subprocess.run(
-            ["bat", "--language=md", "--paging=never", "--wrap=character", "--decorations=never", "--color=always", "-"],
-            input=text,
-            capture_output=True,
-            text=True,
-        )
-        print(result.stdout, end="")
-        return
 
-    print(text)
+def _flat_output(
+    sections: list[Section],
+    commands: list[Command],
+    mode: str,
+    page_filter: str | None,
+    group_filter: str | None,
+    query: str,
+) -> int:
+    candidates = build_candidates(sections, commands, mode, page_filter, group_filter, query)
+    if not candidates:
+        print("No content indexed.", file=sys.stderr)
+        return 1
+    for candidate in candidates:
+        print(display_label(candidate))
+    return 0
+
+
+def _entry_key(entry_route: str, args_page: str | None, args_group: str | None) -> str:
+    if args_page:
+        return f"page:{args_page}"
+    if args_group:
+        return f"group:{args_group}"
+    return entry_route
 
 
 def cmd_picker(
@@ -264,279 +304,128 @@ def cmd_picker(
     page_filter: str | None = None,
     group_filter: str | None = None,
     plain: bool = False,
+    entry_route: str = "search:all",
 ) -> int:
-    """Open the fzf fuzzy picker over the manual and commands.
-
-    Degrades to plain, greppable output when stdout is not a TTY or ``plain``
-    (``--print``) is set — so `om-search … | grep` and headless/CI use work.
-    """
+    """Load content once, then either print flat results or run one fzf."""
     mdir = _ensure_manual()
-    sections = _load_sections(mdir)
+    sections, page_texts = _load_content(mdir)
     commands = find_commands()
-    candidates = build_candidates(
-        sections,
-        commands,
-        mode,
-        page_filter,
-        group_filter,
-        query,
-    )
-
-    if not candidates:
-        print("No content indexed.", file=sys.stderr)
-        return 1
-
-    if plain or not sys.stdout.isatty():
-        for c in candidates:
-            print(display_label(c))
-        return 0
-
-    lines = [render_candidate(c) for c in candidates]
-
-    # Docs are now read inside the picker (Enter = reading mode in the right
-    # pane; Ctrl-O = full pager), so the picker returns only for a command
-    # selection or a back/cancel. A scoped picker (drilled in from a page or
-    # group list) lets Left/Esc pop back to that list.
-    scoped = bool(page_filter or group_filter)
-    selected = run_fzf(lines, query, mode, page_filter, group_filter, back=scoped)
-    if selected == BACK:
-        return GO_BACK
-    if selected is None:
-        return 0
-    cand = parse_fzf_line(selected)
-    if cand is None:
-        return 0
-    kind, payload = action_for(cand)
-    if kind == "echo":
-        print(payload)
-    else:
-        # Fallback: a doc came back (e.g. no reading binds) — open the pager.
-        view_markdown(payload, jump_to=getattr(cand, "heading", "") or None)
-    return 0
-
-
-def _list_pages(
-    mdir: Path,
-) -> list[dict[str, str | int]]:
-    """List manual pages, preferring the pre-built index over disk scan."""
-    index_path = data_dir() / INDEX_FILENAME
-    index_data = load_index(index_path)
-    if index_data is not None:
-        sections, _ = index_data
-        seen: set[str] = set()
-        result: list[dict[str, str | int]] = []
-        for s in sections:
-            if s.page_file not in seen:
-                seen.add(s.page_file)
-                result.append({
-                    "number": s.page_number,
-                    "title": s.page_title,
-                    "file": s.page_file,
-                })
-        result.sort(key=lambda p: p["number"])
-        return result
-    # Fallback: disk scan
-    return [
-        {"number": p.page_number, "title": p.page_title, "file": p.page_file}
-        for p in list_pages(mdir)
-    ]
-
-
-def cmd_pages(query: str = "") -> int:
-    """Browse manual pages: pick one, then search within it."""
-    mdir = _ensure_manual()
-    pages = _list_pages(mdir)
-
-    if not pages:
-        print("No pages found.", file=sys.stderr)
-        return 1
-
-    items = [
-        f"{p['number']:02d}  {p['title']}  ({p['file']})"
-        for p in pages
-    ]
-    header = "Pick a page to search within  |  Enter: select  |  Esc/Ctrl-C: cancel"
-    while True:
-        selected = run_simple_fzf(items, header=header, query=query)
-        if selected is None:
-            return 0
-        # Extract the page file from the selected line (last parenthesised chunk)
-        page_file = selected.rsplit("(", 1)[-1].rstrip(")")
-        result = cmd_picker(mode="doc", page_filter=page_file)
-        if result != GO_BACK:
-            return result
-        # else: user pressed ←/Esc in the scoped picker — reshow the page list
-
-
-def cmd_groups(query: str = "") -> int:
-    """Browse command groups: pick one, then search within it."""
-    commands = find_commands()
-
-    if not commands:
+    if mode == "cmd" and not commands:
         print("Command tree not available (degraded mode).", file=sys.stderr)
         return 1
+    if plain or not sys.stdout.isatty():
+        return _flat_output(sections, commands, mode, page_filter, group_filter, query)
 
-    groups = list_groups(commands)
-    items = [f"omarchy {g}" for g in groups]
-    header = "Pick a group to search within  |  Enter: select  |  Esc/Ctrl-C: cancel"
-    while True:
-        selected = run_simple_fzf(items, header=header, query=query)
+    cfg = load_config()
+    with build_navigation_dataset(sections, commands, cfg=cfg, page_texts=page_texts) as dataset:
+        key = _entry_key(entry_route, page_filter, group_filter)
+        route_id = dataset.entry_routes.get(key)
+        if route_id is None or route_id == "0":
+            if key.startswith("page:"):
+                print(f"Manual page not found: {page_filter}", file=sys.stderr)
+            elif key.startswith("group:"):
+                print(f"Command group not found: {group_filter}", file=sys.stderr)
+            else:
+                print("No navigation route available.", file=sys.stderr)
+            return 1
+        selected = run_fzf(dataset.path, route_id, query=query, cfg=cfg)
         if selected is None:
             return 0
-        group = selected.removeprefix("omarchy ")
-        result = cmd_picker(mode="cmd", group_filter=group)
-        if result != GO_BACK:
-            return result
-        # else: user pressed ←/Esc in the scoped picker — reshow the group list
+        try:
+            row = navigation_row(dataset.path, selected)
+        except (OSError, ValueError):
+            return 0
+        if row.get("kind") == "cmd":
+            payload = row.get("payload")
+            if isinstance(payload, str):
+                print(payload)
+        return 0
+
+
+def _list_pages(mdir: Path) -> list[dict[str, str | int]]:
+    index_data = load_index(data_dir() / INDEX_FILENAME)
+    if index_data is not None:
+        seen: set[str] = set()
+        result: list[dict[str, str | int]] = []
+        for section in index_data[0]:
+            if section.page_file not in seen:
+                seen.add(section.page_file)
+                result.append({"number": section.page_number, "title": section.page_title, "file": section.page_file})
+        result.sort(key=lambda page: page["number"])
+        return result
+    return [{"number": p.page_number, "title": p.page_title, "file": p.page_file} for p in list_pages(mdir)]
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the argument parser.
-
-    Uses flags instead of subparsers to avoid ambiguity between positional
-    query args and subcommand names.  The ``preview`` subcommand is an
-    exception — it is intercepted in ``main()`` before the parser runs
-    because fzf calls ``om-search preview`` with raw positional args.
-    """
     parser = argparse.ArgumentParser(
         prog="om-search",
         description="Search the Omarchy Linux manual and CLI commands from the terminal.",
     )
-
-    parser.add_argument(
-        "query",
-        nargs="*",
-        default=[],
-        help="Optional search query to pre-fill the picker",
-    )
-    parser.add_argument(
-        "--docs",
-        action="store_true",
-        default=False,
-        help="Search manual documentation only",
-    )
-    parser.add_argument(
-        "--cmds",
-        action="store_true",
-        default=False,
-        help="Search CLI commands only",
-    )
-    parser.add_argument(
-        "--page",
-        type=str,
-        default=None,
-        metavar="FILE",
-        help="Search within a specific manual page (filename)",
-    )
-    parser.add_argument(
-        "--group",
-        type=str,
-        default=None,
-        metavar="NAME",
-        help="Search within a specific command group",
-    )
-    parser.add_argument(
-        "--update",
-        action="store_true",
-        default=False,
-        help="Refresh the manual from upstream",
-    )
-    parser.add_argument(
-        "--pages",
-        action="store_true",
-        default=False,
-        help="Browse manual pages, pick one to search within",
-    )
-    parser.add_argument(
-        "--groups",
-        action="store_true",
-        default=False,
-        help="Browse command groups, pick one to search within",
-    )
-    parser.add_argument(
-        "--completion",
-        action="store_true",
-        default=False,
-        help="Print shell completion setup and exit",
-    )
-    parser.add_argument(
-        "--keys",
-        action="store_true",
-        default=False,
-        help="Print the keybinding cheatsheet and exit",
-    )
-    parser.add_argument(
-        "--init-config",
-        action="store_true",
-        default=False,
-        help="Write a default config to ~/.config/om-search/config.toml and exit",
-    )
-    parser.add_argument(
-        "--no-color",
-        action="store_true",
-        default=False,
-        help="Disable ANSI colour (also honors NO_COLOR and TERM=dumb)",
-    )
-    parser.add_argument(
-        "--print",
-        dest="plain",
-        action="store_true",
-        default=False,
-        help="Print ranked results as plain text instead of opening the picker",
-    )
+    parser.add_argument("query", nargs="*", default=[], help="Optional search query to pre-fill the picker")
+    parser.add_argument("--docs", action="store_true", default=False, help="Search manual documentation only")
+    parser.add_argument("--cmds", action="store_true", default=False, help="Search CLI commands only")
+    parser.add_argument("--page", type=str, default=None, metavar="FILE", help="Search within a specific manual page")
+    parser.add_argument("--group", type=str, default=None, metavar="NAME", help="Search within a specific command group")
+    parser.add_argument("--update", action="store_true", default=False, help="Refresh the manual from upstream")
+    parser.add_argument("--pages", action="store_true", default=False, help="Browse manual pages")
+    parser.add_argument("--groups", action="store_true", default=False, help="Browse command groups")
+    parser.add_argument("--completion", action="store_true", default=False, help="Print shell completion setup and exit")
+    parser.add_argument("--keys", action="store_true", default=False, help="Print the keybinding cheatsheet and exit")
+    parser.add_argument("--init-config", action="store_true", default=False, help="Write a default config and exit")
+    parser.add_argument("--no-color", action="store_true", default=False, help="Disable ANSI colour")
+    parser.add_argument("--print", dest="plain", action="store_true", default=False, help="Print ranked results")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
-
-    # Intercept the preview subcommand before argparse — fzf calls this
-    # with raw positional args and no flags.
+    # fzf invokes all private endpoints as raw subcommands.
+    if argv and argv[0] == "nav-data" and len(argv) >= 3:
+        return cmd_nav_data(argv[1], argv[2])
+    if argv and argv[0] == "nav-preview" and len(argv) >= 3:
+        return cmd_nav_preview(argv[1], argv[2])
+    if argv and argv[0] == "nav-reader-preview":
+        if len(argv) in {3, 4}:
+            return cmd_nav_reader_preview(*argv[1:])
+        print("Invalid navigation reader: invalid command arguments", file=sys.stderr)
+        return 1
+    if argv and argv[0] == "nav-reader-move":
+        if len(argv) in {4, 5}:
+            return cmd_nav_reader_move(*argv[1:])
+        print("Invalid navigation reader: invalid command arguments", file=sys.stderr)
+        return 1
+    if argv and argv[0] == "nav-open" and len(argv) >= 3:
+        return cmd_nav_open(argv[1], argv[2])
+    if argv and argv[0] == "nav-copy" and len(argv) >= 3:
+        return cmd_nav_copy(argv[1], argv[2])
+    if argv and argv[0] == "nav-transition" and len(argv) >= 3:
+        return cmd_nav_transition(argv[1], argv[2], argv[3:])
     if argv and argv[0] == "preview" and len(argv) >= 2:
         return cmd_preview(argv[1], argv[2] if len(argv) > 2 else "")
-    if argv and argv[0] == "open" and len(argv) >= 2:
-        return cmd_open(argv[1], argv[2] if len(argv) > 2 else "")
-    if argv and argv[0] == "links" and len(argv) >= 2:
-        return cmd_links(argv[1])
 
     parser = build_parser()
-    # argcomplete only acts during shell completion (when the shell sets
-    # _ARGCOMPLETE); importing it lazily keeps it off the normal startup path.
     if os.environ.get("_ARGCOMPLETE"):
         import argcomplete
         argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
-
-    # A --no-color flag disables colour everywhere by setting NO_COLOR, which
-    # child processes (fzf, the preview/pager subprocesses) inherit.
     if args.no_color:
         os.environ["NO_COLOR"] = "1"
-
     query = " ".join(args.query)
-
     if args.completion:
         print("Add to ~/.bashrc or ~/.zshrc:")
         print('  eval "$(register-python-argcomplete om-search)"')
         return 0
-
     if args.keys:
         print(keys_cheatsheet(), end="")
         return 0
-
     if args.init_config:
         path = write_default_config()
         print(f"Config at {path}")
         return 0
-
     if args.update:
         return cmd_update()
-    if args.pages:
-        return cmd_pages(query)
-    if args.groups:
-        return cmd_groups(query)
 
-    # Determine mode from flags
     if args.docs and args.cmds:
         mode = "all"
     elif args.docs:
@@ -546,10 +435,24 @@ def main(argv: list[str] | None = None) -> int:
     else:
         mode = "all"
 
+    entry_route = "home" if not query else "search:all"
+    if args.pages:
+        entry_route, mode = "pages", "doc"
+    elif args.groups:
+        entry_route, mode = "groups", "cmd"
+    elif args.page:
+        entry_route, mode = "search:doc", "doc"
+    elif args.group:
+        entry_route, mode = "search:cmd", "cmd"
+    elif args.docs:
+        entry_route = "search:doc"
+    elif args.cmds:
+        entry_route = "search:cmd"
     return cmd_picker(
         query=query,
         mode=mode,
         page_filter=args.page,
         group_filter=args.group,
         plain=args.plain,
+        entry_route=entry_route,
     )
