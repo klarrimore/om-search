@@ -20,17 +20,18 @@ source = "omarchy"    # "omarchy" (default) | "catppuccin" | "none"
   `colors.toml`). Re-themes automatically when you switch themes.
 - **`catppuccin`** — built-in Catppuccin Mocha palette. Used as fallback when
   the Omarchy theme is unavailable.
-- **`none`** — no colour; overrides any colour setting including `--no-color`.
+- **`none`** — no custom fzf theming; uses terminal's default colours. Does
+  not disable ANSI rendering or override `NO_COLOR`/`--no-color`.
 
 ### Custom colours
 
-You can override individual tokens under a `[theme.colors]` block:
+You can override individual tokens under a `[theme.custom]` block:
 
 ```toml
 [theme]
 source = "omarchy"
 
-[theme.colors]
+[theme.custom]
 background = "#1e1e2e"
 foreground = "#cdd6f4"
 accent = "#89b4fa"

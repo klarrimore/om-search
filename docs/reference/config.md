@@ -14,7 +14,7 @@ om-search --init-config
 [theme]
 source = "omarchy"               # "omarchy" | "catppuccin" | "none"
 
-[theme.colors]
+[theme.custom]
 # Optional colour overrides — any missing token falls through to the
 # theme source or built-in Catppuccin Mocha palette.
 # background = "#1e1e2e"
@@ -41,9 +41,9 @@ help = "?"
 | `catppuccin` | Built-in Catppuccin Mocha palette. Fallback when Omarchy is unavailable. |
 | `none` | No custom fzf theming — use fzf's default terminal colours. Does **not** disable ANSI rendering or override `NO_COLOR`/`--no-color`. |
 
-## Colour tokens
+## Colour tokens (under `[theme.custom]`)
 
-Overrideable under `[theme.colors]`. Only hex values accepted:
+Overrideable under `[theme.custom]`. Only hex values accepted:
 
 - `background`, `dark_background`
 - `foreground`, `bright_foreground`
