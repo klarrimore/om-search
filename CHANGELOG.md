@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-10-25
 
 ### Added
 - Added granular document reader cursors with independent per-document state,
@@ -13,9 +13,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   toggling within the single fzf session
 - Added Ctrl-L cross-reference navigation from the document reader, with linked
   section selection and return navigation
+- Restructured documentation into Diátaxis quadrants: tutorial (README),
+  how-to guides (docs/how-to/), reference (docs/reference/), and explanation
+  (docs/explanation/)
+- Added public-repo sensitivity guidelines to AGENTS.md
 
 ### Changed
 - Replaced nested pickers and pager loops with one hierarchical fzf session across home, search, manual-page, command-group, reader, and link routes
+- **Display-column cursor tracking**: cursor movement and reverse-video
+  highlighting now operate in display-column space (ANSI escapes stripped),
+  so the `\x1b[7m` marker never lands inside a colour/bold escape sequence
+  where it would corrupt terminal state
+- Cursor highlight uses `\x1b[27m` (reverse-off) instead of `\x1b[0m` so the
+  original foreground/bold styling is preserved on text after the cursor
+- Fixed `_display_columns` to use `_ANSI_RE.match()` instead of a naive
+  `text.find("m")` scan, avoiding false skips on malformed escapes
+
+### Removed
+- Removed unused imports from test files (`pytest`, `Section`, `types`,
+  `CmdCandidate`, `DocCandidate`)
+- Removed unused `_clean_text` helper
 
 ## [0.4.0] - 2026-09-19
 
@@ -95,7 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PyPI package metadata, MIT license, classifiers, and project URLs. (#4)
 - Development toolchain: pytest, mypy, uv build. (#1)
 
-[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/klarrimore/om-search/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/klarrimore/om-search/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/klarrimore/om-search/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/klarrimore/om-search/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/klarrimore/om-search/compare/v0.1.0...v0.2.0

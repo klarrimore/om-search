@@ -72,6 +72,41 @@ def page_text(cand: DocCandidate) -> str:
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
+def _display_columns(text: str) -> list[tuple[int, int]]:
+    """Return ``(raw_start, raw_end)`` slices for each visible display column.
+
+    ANSI escape sequences occupy zero display columns. Each tuple is the
+    half-open raw-string range ``[start, end)`` for one visible character.
+    """
+    cols: list[tuple[int, int]] = []
+    i = 0
+    while i < len(text):
+        if text[i] == "\x1b":
+            m = _ANSI_RE.match(text, i)
+            if m:
+                i = m.end()
+                continue
+            # Lone ESC with no valid sequence — skip one byte.
+            i += 1
+            continue
+        cols.append((i, i + 1))
+        i += 1
+    return cols
+
+
+def _raw_at(text: str, display_col: int) -> int:
+    """Convert a display-column index to a raw-string index.
+
+    Returns ``len(text)`` when *display_col* exceeds the visible width.
+    """
+    cols = _display_columns(text)
+    if not cols or display_col >= len(cols):
+        return len(text)
+    if display_col < 0:
+        return 0
+    return cols[display_col][0]
+
+
 def heading_line(rendered: str, heading: str) -> int:
     """Return the 1-based line containing a rendered markdown heading."""
     target = re.sub(r"\s+", " ", heading).strip()
@@ -670,7 +705,10 @@ def _reader_lines(dataset_dir: Path, preview_id: str) -> tuple[Path, list[str]]:
 def navigation_reader_move(
     dataset_dir: Path, preview_id: str, movement: str, viewport_lines: int = 24
 ) -> int:
-    """Move the line, word, or character cursor for one document preview."""
+    """Move the line, word, or character cursor for one document preview.
+
+    Cursor *column* operates in display-column space (ANSI escapes stripped).
+    """
     allowed = {"reset", "up", "down", "page-up", "page-down", "left", "right",
                "word-left", "word-right", "toggle-mode"}
     if movement not in allowed:
@@ -686,25 +724,31 @@ def navigation_reader_move(
     if movement == "toggle-mode":
         mode = "char" if mode == "word" else "word"
     elif lines:
+        clean = _ANSI_RE.sub("", lines[line])
+        cols = len(clean)
         if movement == "reset":
             line, column = 0, 0
         elif movement in {"up", "down", "page-up", "page-down"}:
             step = 1 if movement in {"up", "down"} else max(1, viewport_lines - 2)
+            prev_line = line
             line = max(0, min(line + (-step if movement in {"up", "page-up"} else step), len(lines) - 1))
-            column = min(column, len(lines[line]))
-        else:
-            text = lines[line]
-            if movement in {"left", "word-left"}:
-                if movement == "word-left":
-                    column = max(0, text.rfind(" ", 0, max(0, column - 1)) + 1)
-                else:
-                    column = max(0, column - 1)
+            if line != prev_line:
+                clean = _ANSI_RE.sub("", lines[line])
+                cols = len(clean)
+            column = min(column, cols)
+        elif movement in {"left", "word-left"}:
+            if movement == "word-left":
+                prev = clean.rfind(" ", 0, max(0, column - 1))
+                column = max(0, prev + 1)
             else:
-                if movement == "word-right":
-                    match = re.search(r"\s+", text[column:])
-                    column = len(text) if not match else min(len(text), column + match.end())
-                else:
-                    column = min(len(text), column + 1)
+                column = max(0, column - 1)
+        else:  # right, word-right
+            if movement == "word-right":
+                rest = clean[column:]
+                match = re.search(r"\s+", rest)
+                column = cols if not match else min(cols, column + match.end())
+            else:
+                column = min(cols, column + 1)
     _write_reader_cursor(cursor_path, line, root)
     _write_reader_cursor(column_path, column, root)
     mode_path.write_text(mode, encoding="utf-8")
@@ -714,7 +758,11 @@ def navigation_reader_move(
 def navigation_reader_preview(
     dataset_dir: Path, preview_id: str, viewport_lines: int = 24
 ) -> str:
-    """Return a centered viewport with a word or character cursor."""
+    """Return a centered viewport with a word or character cursor.
+
+    Cursor and reverse-video highlight operate in display-column space, so
+    the injected ``\\x1b[7m`` marker never lands inside an ANSI escape.
+    """
     root, lines = _reader_lines(dataset_dir, preview_id)
     if viewport_lines <= 0:
         raise ValueError("invalid navigation reader viewport")
@@ -723,7 +771,9 @@ def navigation_reader_preview(
     cursor_path = _reader_cursor_path(root, preview_id)
     column_path, mode_path = _reader_detail_paths(root, preview_id)
     line = max(0, min(_read_reader_cursor(cursor_path), len(lines) - 1))
-    column = max(0, min(int(_read_detail(column_path, "0")), len(lines[line])))
+    raw = lines[line]
+    clean_len = len(_ANSI_RE.sub("", raw))
+    column = max(0, min(int(_read_detail(column_path, "0")), clean_len))
     mode = _read_detail(mode_path, "word")
     content_lines = max(1, viewport_lines - 1)
     start = max(0, min(line - content_lines // 2, len(lines) - content_lines))
@@ -733,11 +783,15 @@ def navigation_reader_preview(
         if index != line:
             rows.append(f"  {text}")
             continue
-        if mode == "char" and column < len(text):
-            if color_enabled():
-                marked = text[:column] + "\x1b[7m" + text[column] + "\x1b[0m" + text[column + 1:]
+        if mode == "char" and column < clean_len:
+            raw_at = _raw_at(text, column)
+            if raw_at < len(text):
+                if color_enabled():
+                    marked = text[:raw_at] + "\x1b[7m" + text[raw_at] + "\x1b[27m" + text[raw_at + 1:]
+                else:
+                    marked = text[:raw_at] + "|" + text[raw_at] + "|" + text[raw_at + 1:]
             else:
-                marked = text[:column] + "|" + text[column] + "|" + text[column + 1:]
+                marked = text
         else:
             marked = text
         rows.append(f"▶ {marked}")

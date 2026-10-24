@@ -118,6 +118,64 @@ def test_reader_cursor_state_is_cached_and_independent(monkeypatch, dataset):
     assert len(calls) == 2
 
 
+def test_reader_cursor_on_ansi_line_does_not_corrupt_terminal(monkeypatch, dataset):
+    """Regression: reverse-video highlight must not inject into ANSI escapes,
+    must wrap a visible character, and must preserve the original SGR
+    (foreground, bold) on the text after the cursor."""
+    preview_id = next(iter(_load_manifest(dataset.path)["previews"]))
+    manifest = _load_manifest(dataset.path)
+    preview_file = manifest["previews"][preview_id]["file"]
+    # Realistic glow-rendered pair: first ANSI-coloured line, second with bold.
+    body = (
+        "\x1b[32m  line 3  body text  \x1b[0m\n"
+        "\x1b[33m→ bold text here\x1b[0m more \x1b[1mwords\x1b[0m\n"
+    )
+    (dataset.path / preview_file).write_text(body, encoding="utf-8")
+    monkeypatch.setattr("om_search.picker.render_markdown", lambda text: text)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
+
+    # Enter char mode, move to the second line, step right 4 display columns.
+    # Display column 4 on the second line is the 'l' of 'bold' (spaces, arrow,
+    # space, 'b', 'o', 'l', 'd'...).
+    navigation_reader_move(dataset.path, preview_id, "down")           # line 1
+    navigation_reader_move(dataset.path, preview_id, "toggle-mode")    # → char mode
+    for _ in range(4):
+        navigation_reader_move(dataset.path, preview_id, "right")
+    preview = navigation_reader_preview(dataset.path, preview_id, 10)
+
+    # 1. No corrupted ANSI sequences.
+    for i, ch in enumerate(preview):
+        if ch == "\x1b" and i + 3 < len(preview) and preview[i + 1] == "[":
+            rest = preview[i + 2:]
+            seq_end = rest.find("m")
+            assert seq_end >= 0, f"ANSI escape never terminated at {i}"
+            params = rest[:seq_end]
+            assert params == "" or all(c.isdigit() or c == ";" for c in params), (
+                f"Corrupted ANSI seq at {i}: %r" % preview[i:i + seq_end + 5]
+            )
+
+    # 2. The visible cursor character is 'l' (display column 4 on line 1).
+    #    The highlight uses \x1b[7m ... \x1b[27m so 'l' is wrapped.
+    assert "\x1b[7ml\x1b[27m" in preview, (
+        "Expected \\x1b[7ml\\x1b[27m for highlighted 'l', got: %r" % preview
+    )
+
+    # 3. The original \x1b[33m foreground still applies after the cursor
+    #    (not erased by \x1b[0m).
+    assert "\x1b[27m" in preview, (
+        "Expected \\x1b[27m to close reverse and leave foreground, got: %r" % preview
+    )
+    # The text after the cursor should still carry \x1b[33m re-applied or
+    # preserved from before the cursor. Since the original line opens with
+    # \x1b[33m and the cursor is inside that span, the \x1b[27m turn-off
+    # leaves \x1b[33m active => "text here\x1b[0m" continues yellow.
+    rest_text = preview[preview.index("\x1b[27m") + len("\x1b[27m"):]
+    assert "text here" in rest_text, (
+        "Expected 'text here' after cursor highlight, got: %r" % preview
+    )
+
+
 def test_reader_preview_empty_and_rejects_invalid_state(monkeypatch, dataset):
     preview_id = _reader_fixture_preview(dataset)
     manifest = _load_manifest(dataset.path)
