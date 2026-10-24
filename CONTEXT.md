@@ -5,7 +5,7 @@ A command-line utility for finding documentation and commands on Omarchy Linux. 
 ## Language
 
 **Manual**:
-The Omarchy documentation set: 51 numbered markdown files in the `manual/` directory of the basecamp/omarchy repo (quattro branch). The canonical source of truth for how Omarchy works.
+The Omarchy documentation set: numbered markdown files in the `manual/` directory of the basecamp/omarchy repo (quattro branch), currently parsed into 300+ searchable sections. The canonical source of truth for how Omarchy works.
 _Avoid_: docs, documentation, wiki
 
 **Command tree**:

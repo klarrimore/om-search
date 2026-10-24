@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import types
-
 import pytest
 
 from om_search import cli
 from om_search.commands import Command
-from om_search.index import CmdCandidate, DocCandidate
 from om_search.manual import Section
 from om_search.picker import _load_manifest, build_navigation_dataset, navigation_rows
 

@@ -1,165 +1,93 @@
 # om-search
 
-Search the [Omarchy Linux](https://github.com/basecamp/omarchy) manual and CLI commands from the terminal.
+Search the [Omarchy Linux](https://github.com/basecamp/omarchy) manual and CLI
+commands from the terminal. Bundles the full manual for offline use and pulls
+the live command tree from the installed `omarchy` CLI when available.
 
-## What it does
+## Quick start
 
-- Bundles the Omarchy manual for offline search
-- Pulls the live `omarchy` CLI command tree on systems where it is installed
-- Opens one hierarchical fzf session: Home, search, manual-page, command-group,
-  section, reader, and cross-reference routes all share the same selector
-- Fuzzy-matches page titles, section headings, command descriptions, and body
-  excerpts in every list route
-- Docs focus in the preview reader; `Ctrl-O` remains the full-page pager escape
-- Command results print to stdout; `Ctrl-Y` copies the command to the clipboard (Wayland)
+### Install
 
-## Install
-
-### AUR (recommended on Omarchy / Arch Linux)
+**On Omarchy / Arch Linux (AUR):**
 
 ```sh
 yay -S om-search
-# or
-paru -S om-search
 ```
 
-The Arch package depends on `arch-wiki-lite` for local Arch Wiki text search.
-The larger `arch-wiki-docs` HTML dump is optional and only needed for
-`wiki-search-html`.
-
-### PyPI
-
-Requires `uv`:
+**With uv (any distro):**
 
 ```sh
-sudo pacman -S --needed uv
-```
-
-```sh
+sudo pacman -S --needed uv   # or install uv from https://docs.astral.sh/uv/
 uv tool install om-search
-# or
-pip install om-search
 ```
 
-### From source
+See [Install](docs/how-to/install.md) for all methods (PyPI, source, AUR).
+
+### First search
 
 ```sh
-sudo pacman -S --needed uv
-git clone https://github.com/klarrimore/om-search.git
-cd om-search
-uv build
-uv tool install dist/*.whl
+om-search
 ```
 
-## Usage
+This opens a fuzzy finder (fzf) at a Home route with three choices:
+
+- **Search all** — search docs and commands together (also the default when
+  you type a query on the command line)
+- **Manual pages** — browse pages, pick one to search within
+- **Command groups** — browse groups, pick one to search within
+
+Type to filter, `Enter` to descend, `Esc` to go back or quit.
+
+### Search from the terminal
 
 ```sh
-om-search                    # open the picker with all sources
-om-search screenshot         # open the picker, pre-filled with "screenshot"
-om-search --docs             # search manual documentation only
-om-search --cmds             # search CLI commands only
-om-search --pages            # browse manual pages, pick one to search within
-om-search --groups           # browse command groups, pick one to search within
-om-search --page 04-navigation.md   # search within a specific page
-om-search --group capture    # search within a specific command group
-om-search --update           # pull the latest manual and re-index commands
-om-search --print foo        # print ranked results as plain text (no picker)
-om-search --no-color         # disable ANSI colour (also honors NO_COLOR/TERM=dumb)
+om-search screenshot            # open the picker with "screenshot" typed in
+om-search screenshot region     # multi-word query
 ```
 
-
-When stdout is not a terminal (e.g. piped into `grep`), the picker is skipped and
-the ranked results are printed as plain text automatically, the same as `--print`.
-On machines without the `omarchy` CLI (non-Omarchy distros), the command
-surface is disabled and doc search still works -- degraded mode.
-
-`om-search` starts at a Home route with `Search all`, `Manual pages`, and
-`Command groups` when the live command tree is available. `Enter` or `Right`
-descends into a route; `Left` or `Escape` backs out. Selecting a document
-focuses its preview as a reader without leaving the current result list.
-
-`--docs` and `--cmds` enter source-filtered search routes. `--pages` and
-`--groups` enter their browsing routes, while `--page` and `--group` enter a
-specific scoped route. Cross-references opened with `Ctrl-L` use the same fzf
-session and return to their link list before the originating route.
-
-## Appearance and keybindings
-
-The picker follows a herdr-style TUI: a rounded, bordered layout whose colours
-track the **active Omarchy theme** (read from the theme's `colors.toml`, so it
-re-themes when you switch themes), with vim-style navigation and a `?` help
-overlay.
-
-| Key | Action |
-| --- | --- |
-| `Up` / `Down` | select in lists / move between lines in the reader |
-| `PageUp` / `PageDown` | page lists / page the reader cursor |
-| `Left` / `Right` | back in lists / move by character in the reader |
-| `Alt-Left` / `Alt-Right` | move by word in the reader |
-| `Ctrl-]` | toggle word and character cursor modes |
-| `Enter` | descend, focus a document, or accept a command |
-| `Tab` | focus / unfocus the reader |
-| `Escape` | back one route; Escape quits at Home |
-| `Ctrl-J` / `Ctrl-K` | additional configured move down / up |
-| `Ctrl-D` / `Ctrl-U` | additional configured half-page cursor movement |
-| `Ctrl-L` | follow cross-reference links |
-| `Ctrl-Y` | copy and accept a command |
-| `?` | show the keybindings in the preview |
-
-Plain letters remain fuzzy-search input. Configure the additional Ctrl chords
-in `~/.config/om-search/config.toml`.
-
-Configure theme and keys in `~/.config/om-search/config.toml` (herdr-style
-`[theme]` and `[keys]` tables):
+### Find a CLI command
 
 ```sh
-om-search --init-config   # write a commented starter config
-om-search --keys          # print the current keybindings
+om-search --cmds wallpaper       # search commands only
 ```
 
-```toml
-[theme]
-# "omarchy" (default, follow active theme) | "catppuccin" | "none"
-source = "omarchy"
+Select one and press `Enter` — the command (e.g. `omarchy theme bg next`)
+prints to stdout. Press `Ctrl-Y` to print *and* copy to the Wayland clipboard
+in one step.
 
-[keys]
-down = "ctrl-j"
-up = "ctrl-k"
-help = "?"
-```
-
-## How it works
-
-The manual is cloned shallowly and sparsely into the XDG data dir
-(`~/.local/share/om-search/omarchy-repo/manual/`), tracking the `quattro`
-branch of the upstream Omarchy repository. On update it is parsed once into a
-pre-built JSON index (`~/.local/share/om-search/index.json`) that the picker
-and preview use directly for fast startup, so the 51 manual pages are not
-re-parsed on every keystroke. A pacman hook (shipped in
-`packaging/om-search.hook` and installed via the AUR package) triggers
-`om-search --update` after every system update so the docs stay in sync
-with the installed release.
-
-## Development
+### Read a manual section
 
 ```sh
-sudo pacman -S --needed uv
-uv sync --extra dev
-uv run pytest
-uv run mypy src/
+om-search --docs navigation      # search docs only
 ```
 
-## Packaging
+Select a result. The selected section opens in the preview reader on the right.
+Press `Tab` to focus the reader and scroll with arrow keys, `Enter` or `Esc`
+to return to the list. Press `Ctrl-O` to open the full page in an interactive
+pager (`less`), positioned at the matched heading.
 
-The `packaging/` directory contains:
+### Keep the manual up to date
 
-- **PKGBUILD** -- Arch Linux / AUR package recipe
-- **om-search.hook** -- pacman hook that refreshes the doc index after an `omarchy` package upgrade
+```sh
+om-search --update
+```
 
-The AUR package intentionally uses `arch-wiki-lite` instead of the larger
-`arch-wiki-docs` package. Install `arch-wiki-docs` only when browser-style
-offline HTML lookup via `wiki-search-html` is needed.
+This pulls the latest manual from upstream and rebuilds the search index.
+If installed via the AUR package, a pacman hook runs this automatically after
+every system update.
+
+## Next steps
+
+- [Search, filter, and browse](docs/how-to/search.md) — source filters, page
+  and group scoping, scoped search
+- [Navigating the reader](docs/how-to/reader.md) — cursor modes, cross-reference
+  links, pager escape
+- [Configuration](docs/how-to/configure.md) — theme, keybindings, config file
+- [CLI reference](docs/reference/cli.md) — all flags and subcommands
+- [Keybindings](docs/reference/keys.md) — every key, default and configurable
+- [How it works](docs/explanation/architecture.md) — hierarchical fzf routes,
+  indexing, degraded mode
 
 ## License
 
-MIT -- see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

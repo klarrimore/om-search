@@ -1,14 +1,11 @@
 """Tests for manual parsing."""
 
-import re
 from pathlib import Path
-
-import pytest
 
 FIXTURES = Path(__file__).parent / "fixtures" / "manual"
 
 # Test targets imported from the package
-from om_search.manual import Section, PageInfo, parse_manual_file, anchor_from_heading, list_pages
+from om_search.manual import PageInfo, parse_manual_file, anchor_from_heading, list_pages
 
 
 class TestListPages:
